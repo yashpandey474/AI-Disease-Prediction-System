@@ -69,17 +69,17 @@ public class DBConnection {
             qw.setString(2, "bcancerdata");
             ResultSet r = qw.executeQuery();
             if(!r.next()){
-               String sq = "create table bcancerdata (codenumber int not null primary key, "
-                    + "clumpthickness int not null, "
-                    + "csizeuni int not null, "
-                    + "cshapeuni int not null, "
-                    + "madhesion int not null, "
-                    + "secs int not null, "
-                    + "barenuclei varchar(2) not null, "
-                    + "blandchromatin int not null, "
-                    + "normalnucleoli int not null, "
-                    + "mitoses int not null, "
-                    + "class int not null "
+               String sq = "create table bcancerdata (codenumber int , "
+                    + "clumpthickness int , "
+                    + "csizeuni int , "
+                    + "cshapeuni int , "
+                    + "madhesion int , "
+                    + "secs int , "
+                    + "barenuclei varchar(2), "
+                    + "blandchromatin int , "
+                    + "normalnucleoli int, "
+                    + "mitoses int, "
+                    + "class int "
                     + ");";
                 PreparedStatement pst = con.prepareStatement(sq);
                 pst.executeUpdate(); 

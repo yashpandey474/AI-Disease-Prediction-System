@@ -17,7 +17,7 @@ public class DBConnection {
         try {
             boolean exists=false;
             Class.forName("com.mysql.cj.jdbc.Driver"); 
-            String databaseName = "bcp";
+            String databaseName = "hdp";
             String username = "root";
             String password = "rootpass";
 
@@ -46,7 +46,7 @@ public class DBConnection {
     }
     public static Connection getConnection(){
         String driver = "com.mysql.cj.jdbc.Driver";
-        String url = "jdbc:mysql://localhost:3306/bcp";
+        String url = "jdbc:mysql://localhost:3306/hdp";
         String username = "root";
         String password = "rootpass";
         try{
@@ -65,25 +65,25 @@ public class DBConnection {
             con = DBConnection.getConnection();
             String p = "SELECT * FROM information_schema.tables WHERE table_schema = ? AND table_name = ? LIMIT 1;";
             PreparedStatement qw = con.prepareStatement(p);
-            qw.setString(1, "bcp");
-            qw.setString(2, "bcancerdata");
+            qw.setString(1, "hdp");
+            qw.setString(2, "heartdata");
             ResultSet r = qw.executeQuery();
             if(!r.next()){
-               String sq = "create table bcancerdata ("
-                       + "age int, "
-                    + "sex varchar(2) not null, "
-                    + "cp varchar(2) not null, "
-                    + "trestbps varchar(2) not null, "
-                    + "chol varchar(2) not null, "
-                    + "fbs varchar(2) not null, "
-                    + "restecg varchar(2) not null, "
-                    + "thalach varchar(2) not null, "
-                    + "exang varchar(2) not null, "
-                    + "oldpeak varchar(2) not null, "
-                    + "slope varchar(2) not null, "
-                    + "ca varchar(2) not null, "
-                    + "thal varchar(2) not null, "
-                    + "num varchar(2) not null "
+               String sq = "create table heartdata ("
+                       + "age numeric(10,2), "
+                    + "sex numeric(10,2), "
+                    + "cp numeric(10,2), "
+                    + "trestbps numeric(10,2), "
+                    + "chol numeric(10,2), "
+                    + "fbs numeric(10,2), "
+                    + "restecg numeric(10,2), "
+                    + "thalach numeric(10,2), "
+                    + "exang numeric(10,2), "
+                    + "oldpeak numeric(10,2), "
+                    + "slope numeric(10,2), "
+                    + "ca varchar(10), "
+                    + "thal varchar(10), "
+                    + "num int"
                     + ");";
                 PreparedStatement pst = con.prepareStatement(sq);
                 pst.executeUpdate(); 

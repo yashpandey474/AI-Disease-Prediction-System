@@ -12,7 +12,8 @@ import java.util.Scanner;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.*;
-import java.lang.Math;
+import java.lang.*;
+import java.io.*;
 
 public class BreastCancerPrediction {
     
@@ -25,6 +26,10 @@ public class BreastCancerPrediction {
         ArrayList<BreastCancerMissingData> almd = new ArrayList<BreastCancerMissingData>();
         ArrayList<BreastCancerCompleteData> alcd = new ArrayList<BreastCancerCompleteData>();
         readMissingAndCompleteData(almd, alcd);
+        //TESTING = ALMD
+        //TRAINING = ALCD
+        int k = bestK(alcd);
+        System.out.println("K = " + k);
     }
     public static void readAndAddData(){
         Scanner sc = null;
@@ -152,26 +157,38 @@ public class BreastCancerPrediction {
         return -i;
     }
     public static ArrayList<Integer> kNearestNeighbors(BreastCancerCompleteData item1, ArrayList<BreastCancerCompleteData> items, int k){
-        ArrayList<Integer> neighbors = new ArrayList<>();
+        ArrayList<BreastCancerCompleteData> neighbors = new ArrayList<>();
         int distance = 0;
-        
+//        System.out.println("HELLO???");
         for(BreastCancerCompleteData item: items){
             distance = distanceMetric(item1, item);
-            if(neighbors.size()<k || Collections.max(neighbors)>distance){
-                neighbors.add(item.getBareNuclei());
-                neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
+            if(neighbors.size()<k ){
+//                System.out.println("CALLED");
+                neighbors.add(item);
+//                neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
             }    
+            else{ 
+                if( Collections.max(neighbors)>dist){
+                    neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
+                    neighbors.add(item.getBareNuclei());
+                    
+                }
+            }
+        
         }
+        System.out.println("SIZE1 = " + neighbors.size());
 
         return neighbors;
     }
     public static ArrayList<Integer> kNearestNeighbors(BreastCancerMissingData item1, ArrayList<BreastCancerCompleteData> items, int k){
         ArrayList<Integer> neighbors = new ArrayList<>();
         int distance = 0;
-        
+        System.out.println("HELLO???");
         for(BreastCancerCompleteData item: items){
             distance = distanceMetric(item1, item);
+            System.out.println("SIZE = " + neighbors.size());
             if(neighbors.size()<k || Collections.max(neighbors)>distance){
+                System.out.println("ITEM = " + item.getBareNuclei());
                 neighbors.add(item.getBareNuclei());
                 neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
             }    
@@ -186,6 +203,9 @@ public class BreastCancerPrediction {
         int sum = 0;
         for(Integer i: arr){
             sum+=i;
+        }
+        if(arr.isEmpty()){
+            return 1000;
         }
         return sum/arr.size();
     }
@@ -202,9 +222,11 @@ public class BreastCancerPrediction {
         int sumDiff =0;
         for(BreastCancerCompleteData item: trainingSet){
             known = item.getBareNuclei();
+            
             replica = cloneList(trainingSet);
             replica.remove(trainingSet.indexOf(item));
             predicted = listAverage((kNearestNeighbors(item, replica, k)));
+//            System.out.println("KNOWN = " + known + " PREDICTED = " + predicted);
             sumDiff += abs(predicted-known);
         }
         return sumDiff/trainingSet.size();
@@ -216,7 +238,9 @@ public class BreastCancerPrediction {
             kmap.put(k, accuracyOfK(k, trainingSet));
         }
         int k = 1;
+        
         for(Map.Entry<Integer, Double> ele: kmap.entrySet()){
+            System.out.println("K = " + ele.getKey() + " VAL = " + ele.getValue());
             if(ele.getValue()<kmap.get(k)){
                 k = ele.getKey();
             }

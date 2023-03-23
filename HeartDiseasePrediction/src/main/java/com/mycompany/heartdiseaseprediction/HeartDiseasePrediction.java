@@ -12,6 +12,10 @@ import java.util.Scanner;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.lang.Math;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 public class HeartDiseasePrediction {
 
@@ -118,5 +122,170 @@ public class HeartDiseasePrediction {
         catch(Exception e){
             System.out.println(e);
         }
+    }
+    private static double abs(double i) {
+        if(i>0){
+            return i;
+        }    
+        return -i;
+    }
+    public static double distanceMetric(HeartDiseaseCompleteData item1, HeartDiseaseCompleteData item2){
+        //ASSUMING ITEM1 HAS THE MISSING DATA IN 6TH INDEX
+        double diff = 0;
+        diff += abs(item1.getAge() - item2.getAge());
+        diff += abs(item1.getChol() - item2.getChol());
+        diff += abs(item1.getCp() - item2.getCp());
+        diff += abs(item1.getExang()- item2.getExang());
+        diff += abs(item1.getFbs() - item2.getFbs());
+        diff += abs(item1.getNum() - item2.getNum());
+        diff += abs(item1.getOldpeak() - item2.getOldpeak());
+        diff += abs(item1.getRestecg() - item2.getRestecg());
+        diff += abs(item1.getSex() - item2.getSex());
+        diff += abs(item1.getSlope() - item2.getSlope());
+        diff += abs(item1.getThalach() - item2.getThalach());
+        diff += abs(item1.getTrestbps() - item2.getTrestbps());
+        return diff;
+    }
+    public static double distanceMetric(HeartDiseaseMissingData item1, HeartDiseaseCompleteData item2){
+        //ASSUMING ITEM1 HAS THE MISSING DATA IN 6TH INDEX
+        double diff = 0;
+        diff += abs(item1.getAge() - item2.getAge());
+        diff += abs(item1.getChol() - item2.getChol());
+        diff += abs(item1.getCp() - item2.getCp());
+        diff += abs(item1.getExang()- item2.getExang());
+        diff += abs(item1.getFbs() - item2.getFbs());
+        diff += abs(item1.getNum() - item2.getNum());
+        diff += abs(item1.getOldpeak() - item2.getOldpeak());
+        diff += abs(item1.getRestecg() - item2.getRestecg());
+        diff += abs(item1.getSex() - item2.getSex());
+        diff += abs(item1.getSlope() - item2.getSlope());
+        diff += abs(item1.getThalach() - item2.getThalach());
+        diff += abs(item1.getTrestbps() - item2.getTrestbps());
+        return diff;
+    }
+    public static ArrayList<Double> kNearestNeighbors_ca(HeartDiseaseCompleteData item1, ArrayList<HeartDiseaseCompleteData> items, int k){
+        ArrayList<Double> neighbors = new ArrayList<>();
+        double distance = 0;
+        
+        for(HeartDiseaseCompleteData item: items){
+            distance = distanceMetric(item1, item);
+            if(neighbors.size()<k || Collections.max(neighbors)>distance){
+                neighbors.add(item.getCa());
+                neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
+            }    
+        }
+
+        return neighbors;
+    }
+    public static ArrayList<Double> kNearestNeighbors_ca(HeartDiseaseMissingData item1, ArrayList<HeartDiseaseCompleteData> items, int k){
+        ArrayList<Double> neighbors = new ArrayList<>();
+        double distance = 0;
+        
+        for(HeartDiseaseCompleteData item: items){
+            distance = distanceMetric(item1, item);
+            if(neighbors.size()<k || Collections.max(neighbors)>distance){
+                neighbors.add(item.getCa());
+                neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
+            }    
+        }
+
+        return neighbors;
+    }
+    public static ArrayList<Double> kNearestNeighbors_thal(HeartDiseaseCompleteData item1, ArrayList<HeartDiseaseCompleteData> items, int k){
+        ArrayList<Double> neighbors = new ArrayList<>();
+        double distance = 0;
+        
+        for(HeartDiseaseCompleteData item: items){
+            distance = distanceMetric(item1, item);
+            if(neighbors.size()<k || Collections.max(neighbors)>distance){
+                neighbors.add(item.getThal());
+                neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
+            }    
+        }
+
+        return neighbors;
+    }
+    public static ArrayList<Double> kNearestNeighbors_thal(HeartDiseaseMissingData item1, ArrayList<HeartDiseaseCompleteData> items, int k){
+        ArrayList<Double> neighbors = new ArrayList<>();
+        double distance = 0;
+        
+        for(HeartDiseaseCompleteData item: items){
+            distance = distanceMetric(item1, item);
+            if(neighbors.size()<k || Collections.max(neighbors)>distance){
+                neighbors.add(item.getThal());
+                neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
+            }    
+        }
+
+        return neighbors;
+    }
+    public static double percent(int a, int b){
+        return (a/b)*100;
+    }
+    public static double listAverage(ArrayList<Double> arr){
+        double sum = 0;
+        for(Double i: arr){
+            sum+=i;
+        }
+        return sum/arr.size();
+    }
+    public static ArrayList<HeartDiseaseCompleteData> cloneList(ArrayList<HeartDiseaseCompleteData> arr){
+        ArrayList<HeartDiseaseCompleteData> replica = new ArrayList<>();
+        for(HeartDiseaseCompleteData item: arr){
+            replica.add(item);
+        }
+        return replica;
+    }
+    public static double accuracyOfK_ca(int k, ArrayList<HeartDiseaseCompleteData> trainingSet){
+        ArrayList<HeartDiseaseCompleteData> replica;
+        double known, predicted;
+        int sumDiff =0;
+        for(HeartDiseaseCompleteData item: trainingSet){
+            known = item.getCa();
+            replica = cloneList(trainingSet);
+            replica.remove(trainingSet.indexOf(item));
+            predicted = listAverage((kNearestNeighbors_ca(item, replica, k)));
+            sumDiff += abs(predicted-known);
+        }
+        return sumDiff/trainingSet.size();
+    }
+    public static double accuracyOfK_thal(int k, ArrayList<HeartDiseaseCompleteData> trainingSet){
+        ArrayList<HeartDiseaseCompleteData> replica;
+        double known, predicted;
+        int sumDiff =0;
+        for(HeartDiseaseCompleteData item: trainingSet){
+            known = item.getThal();
+            replica = cloneList(trainingSet);
+            replica.remove(trainingSet.indexOf(item));
+            predicted = listAverage((kNearestNeighbors_ca(item, replica, k)));
+            sumDiff += abs(predicted-known);
+        }
+        return sumDiff/trainingSet.size();
+    }
+    public static int bestK_ca(ArrayList<HeartDiseaseCompleteData> trainingSet){
+        HashMap<Integer, Double> kmap = new HashMap<>();
+        for(int k = 1; k<26; k++){
+            kmap.put(k, accuracyOfK_ca(k, trainingSet));
+        }
+        int k = 1;
+        for(Map.Entry<Integer, Double> ele: kmap.entrySet()){
+            if(ele.getValue()<kmap.get(k)){
+                k = ele.getKey();
+            }
+        }
+        return k;
+    }
+    public static int bestK_thal(ArrayList<HeartDiseaseCompleteData> trainingSet){
+        HashMap<Integer, Double> kmap = new HashMap<>();
+        for(int k = 1; k<26; k++){
+            kmap.put(k, accuracyOfK_thal(k, trainingSet));
+        }
+        int k = 1;
+        for(Map.Entry<Integer, Double> ele: kmap.entrySet()){
+            if(ele.getValue()<kmap.get(k)){
+                k = ele.getKey();
+            }
+        }
+        return k;
     }
 }

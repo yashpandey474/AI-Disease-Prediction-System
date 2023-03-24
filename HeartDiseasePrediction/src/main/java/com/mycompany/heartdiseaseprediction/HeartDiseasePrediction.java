@@ -27,6 +27,30 @@ public class HeartDiseasePrediction {
         ArrayList<HeartDiseaseMissingData> almd = new ArrayList<HeartDiseaseMissingData>();
         ArrayList<HeartDiseaseCompleteData> alcd = new ArrayList<HeartDiseaseCompleteData>();
         readMissingAndCompleteData(almd, alcd);
+        
+        int k2 = bestK_thal(alcd);
+        int k1 = bestK_ca(alcd);
+        
+        System.out.println("CA K = " + k1 + " THAL K = " + k2);
+        
+        //USE K1 AND K2 TO CREATE
+        completeValues(almd, alcd, k1, k2);
+    }
+    
+    public static void completeValues(ArrayList<HeartDiseaseMissingData> testing,  ArrayList<HeartDiseaseCompleteData> training, int kCa, int kThal){
+        ArrayList<HeartDiseaseCompleteData> replica = training;
+        for(HeartDiseaseMissingData item: testing){
+            if(item.ca == -1){
+                double predicted = listAverage(kNearestNeighbors_ca(item, replica, kCa));
+                item.setCa(predicted);
+            }
+            if(item.thal == -1){
+                double predicted = listAverage(kNearestNeighbors_thal(item, replica, kThal));
+                item.setThal(predicted);
+            }
+            HeartDiseaseCompleteData item1 = new HeartDiseaseCompleteData(item.age, item.sex, item.cp, item.trestbps, item.chol, item.fbs, item.restecg,item.thalach, item.exang, item.oldpeak, item.slope, item.ca, item.thal, item.num);
+            replica.add(item1);
+        }
     }
     public static void readAndAddData(){
         Scanner sc = null;
@@ -164,59 +188,100 @@ public class HeartDiseasePrediction {
         return diff;
     }
     public static ArrayList<Double> kNearestNeighbors_ca(HeartDiseaseCompleteData item1, ArrayList<HeartDiseaseCompleteData> items, int k){
-        ArrayList<Double> neighbors = new ArrayList<>();
+         ArrayList<Double> neighbors = new ArrayList<>(); //BARE NUCLEI STORED
+         HashMap<Double, Double> nuclieDist = new HashMap<>(); //DISTANCE->BARE NUCLEI
         double distance = 0;
-        
+
         for(HeartDiseaseCompleteData item: items){
+            // System.out.println("IN Knn" + items.size());
             distance = distanceMetric(item1, item);
-            if(neighbors.size()<k || Collections.max(neighbors)>distance){
+            if(neighbors.size()<k && distance!=0){
                 neighbors.add(item.getCa());
-                neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
+                nuclieDist.put(distance, item.getCa());
             }    
+            else{ 
+                if(!nuclieDist.keySet().isEmpty() && Collections.max(nuclieDist.keySet())>distance && distance!=0){                    
+                    neighbors.add(item.getCa());
+                    neighbors.remove(neighbors.indexOf(nuclieDist.get(Collections.max(nuclieDist.keySet()))));
+                    nuclieDist.put(distance, item.getCa());
+                    nuclieDist.remove(Collections.max(nuclieDist.keySet()));
+                }
+            }
+        
         }
 
         return neighbors;
     }
     public static ArrayList<Double> kNearestNeighbors_ca(HeartDiseaseMissingData item1, ArrayList<HeartDiseaseCompleteData> items, int k){
-        ArrayList<Double> neighbors = new ArrayList<>();
+         ArrayList<Double> neighbors = new ArrayList<>(); //BARE NUCLEI STORED
+         HashMap<Double, Double> nuclieDist = new HashMap<>(); //DISTANCE->BARE NUCLEI
         double distance = 0;
-        
-        for(HeartDiseaseCompleteData item: items){
-            distance = distanceMetric(item1, item);
-            if(neighbors.size()<k || Collections.max(neighbors)>distance){
-                neighbors.add(item.getCa());
-                neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
-            }    
-        }
 
+        for(HeartDiseaseCompleteData item: items){
+            // System.out.println("IN Knn" + items.size());
+            distance = distanceMetric(item1, item);
+            if(neighbors.size()<k && distance!=0){
+                neighbors.add(item.getCa());
+                nuclieDist.put(distance, item.getCa());
+            }    
+            else{ 
+                if(!nuclieDist.keySet().isEmpty() && Collections.max(nuclieDist.keySet())>distance && distance!=0){                    
+                    neighbors.add(item.getCa());
+                    neighbors.remove(neighbors.indexOf(nuclieDist.get(Collections.max(nuclieDist.keySet()))));
+                    nuclieDist.put(distance, item.getCa());
+                    nuclieDist.remove(Collections.max(nuclieDist.keySet()));
+                }
+            }
+        
+        }
         return neighbors;
     }
     public static ArrayList<Double> kNearestNeighbors_thal(HeartDiseaseCompleteData item1, ArrayList<HeartDiseaseCompleteData> items, int k){
-        ArrayList<Double> neighbors = new ArrayList<>();
+        ArrayList<Double> neighbors = new ArrayList<>(); //BARE NUCLEI STORED
+         HashMap<Double, Double> nuclieDist = new HashMap<>(); //DISTANCE->BARE NUCLEI
         double distance = 0;
-        
-        for(HeartDiseaseCompleteData item: items){
-            distance = distanceMetric(item1, item);
-            if(neighbors.size()<k || Collections.max(neighbors)>distance){
-                neighbors.add(item.getThal());
-                neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
-            }    
-        }
 
+        for(HeartDiseaseCompleteData item: items){
+            // System.out.println("IN Knn" + items.size());
+            distance = distanceMetric(item1, item);
+            if(neighbors.size()<k && distance!=0){
+                neighbors.add(item.getThal());
+                nuclieDist.put(distance, item.getThal());
+            }    
+            else{ 
+                if(!nuclieDist.keySet().isEmpty() && Collections.max(nuclieDist.keySet())>distance && distance!=0){                    
+                    neighbors.add(item.getThal());
+                    neighbors.remove(neighbors.indexOf(nuclieDist.get(Collections.max(nuclieDist.keySet()))));
+                    nuclieDist.put(distance, item.getThal());
+                    nuclieDist.remove(Collections.max(nuclieDist.keySet()));
+                }
+            }
+        
+        }
         return neighbors;
     }
     public static ArrayList<Double> kNearestNeighbors_thal(HeartDiseaseMissingData item1, ArrayList<HeartDiseaseCompleteData> items, int k){
-        ArrayList<Double> neighbors = new ArrayList<>();
+        ArrayList<Double> neighbors = new ArrayList<>(); //BARE NUCLEI STORED
+         HashMap<Double, Double> nuclieDist = new HashMap<>(); //DISTANCE->BARE NUCLEI
         double distance = 0;
-        
-        for(HeartDiseaseCompleteData item: items){
-            distance = distanceMetric(item1, item);
-            if(neighbors.size()<k || Collections.max(neighbors)>distance){
-                neighbors.add(item.getThal());
-                neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
-            }    
-        }
 
+        for(HeartDiseaseCompleteData item: items){
+            // System.out.println("IN Knn" + items.size());
+            distance = distanceMetric(item1, item);
+            if(neighbors.size()<k && distance!=0){
+                neighbors.add(item.getThal());
+                nuclieDist.put(distance, item.getThal());
+            }    
+            else{ 
+                if(!nuclieDist.keySet().isEmpty() && Collections.max(nuclieDist.keySet())>distance && distance!=0){                    
+                    neighbors.add(item.getThal());
+                    neighbors.remove(neighbors.indexOf(nuclieDist.get(Collections.max(nuclieDist.keySet()))));
+                    nuclieDist.put(distance, item.getThal());
+                    nuclieDist.remove(Collections.max(nuclieDist.keySet()));
+                }
+            }
+        
+        }
         return neighbors;
     }
     public static double percent(int a, int b){
@@ -242,12 +307,10 @@ public class HeartDiseasePrediction {
         int sumDiff =0;
         for(HeartDiseaseCompleteData item: trainingSet){
             known = item.getCa();
-            replica = cloneList(trainingSet);
-            replica.remove(trainingSet.indexOf(item));
-            predicted = listAverage((kNearestNeighbors_ca(item, replica, k)));
+            predicted = listAverage((kNearestNeighbors_ca(item, trainingSet, k)));
             sumDiff += abs(predicted-known);
         }
-        return sumDiff/trainingSet.size();
+        return sumDiff;
     }
     public static double accuracyOfK_thal(int k, ArrayList<HeartDiseaseCompleteData> trainingSet){
         ArrayList<HeartDiseaseCompleteData> replica;
@@ -255,12 +318,10 @@ public class HeartDiseasePrediction {
         int sumDiff =0;
         for(HeartDiseaseCompleteData item: trainingSet){
             known = item.getThal();
-            replica = cloneList(trainingSet);
-            replica.remove(trainingSet.indexOf(item));
-            predicted = listAverage((kNearestNeighbors_ca(item, replica, k)));
+            predicted = listAverage((kNearestNeighbors_ca(item, trainingSet, k)));
             sumDiff += abs(predicted-known);
         }
-        return sumDiff/trainingSet.size();
+        return sumDiff;
     }
     public static int bestK_ca(ArrayList<HeartDiseaseCompleteData> trainingSet){
         HashMap<Integer, Double> kmap = new HashMap<>();

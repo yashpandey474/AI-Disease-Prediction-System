@@ -68,22 +68,27 @@ public class DBConnection {
             qw.setString(1, "bcp");
             qw.setString(2, "bcancerdata");
             ResultSet r = qw.executeQuery();
-            if(!r.next()){
-               String sq = "create table bcancerdata (codenumber int , "
-                    + "clumpthickness int , "
-                    + "csizeuni int , "
-                    + "cshapeuni int , "
-                    + "madhesion int , "
-                    + "secs int , "
-                    + "barenuclei varchar(2), "
-                    + "blandchromatin int , "
-                    + "normalnucleoli int, "
-                    + "mitoses int, "
-                    + "class int "
-                    + ");";
-                PreparedStatement pst = con.prepareStatement(sq);
-                pst.executeUpdate(); 
+            if(r.next()){
+                String sss = "drop table bcancerdata;";
+                PreparedStatement ppp = con.prepareStatement(sss);
+                ppp.executeUpdate();
             }
+            
+            String sq = "create table bcancerdata (codenumber int , "
+                 + "clumpthickness int , "
+                 + "csizeuni int , "
+                 + "cshapeuni int , "
+                 + "madhesion int , "
+                 + "secs int , "
+                 + "barenuclei varchar(2), "
+                 + "blandchromatin int , "
+                 + "normalnucleoli int, "
+                 + "mitoses int, "
+                 + "class int "
+                 + ");";
+             PreparedStatement pst = con.prepareStatement(sq);
+             pst.executeUpdate(); 
+            
         }
         catch(Exception e){
             System.out.println(e);

@@ -10,7 +10,7 @@ package com.mycompany.heartdiseaseprediction;
  */
 public class HeartDiseaseMissingData {
     
-    double age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca, thal;
+    double age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca=-1, thal = -1;
     int num;
     public HeartDiseaseMissingData(
             double age, double sex, double cp, double trestbps, double chol, double fbs, double restecg,

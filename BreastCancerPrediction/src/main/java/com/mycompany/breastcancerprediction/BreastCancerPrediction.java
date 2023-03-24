@@ -30,6 +30,17 @@ public class BreastCancerPrediction {
         //TRAINING = ALCD
         int k = bestK(alcd);
         System.out.println("K = " + k);
+        completeValues(almd, alcd, k);
+    }
+    public static void completeValues(ArrayList<BreastCancerMissingData> testing, ArrayList<BreastCancerCompleteData> training, int k){
+         ArrayList<BreastCancerCompleteData> replica = training;
+        for(BreastCancerMissingData item: testing){
+            int predicted = listAverage(kNearestNeighbors(item, replica, k));
+            item.setBareNuclei(predicted);
+            BreastCancerCompleteData item1 = new BreastCancerCompleteData(item.codeNumber, item.clumpThickness, item.cSizeUni, item.cShapeUni, item.mAdhesion, item.secs, item.bareNuclei, 
+            item.blandChromatin,  item.normalNucleoli, item.mitoses, item.classification);
+            replica.add(item1);
+        }
     }
     public static void readAndAddData(){
         Scanner sc = null;
@@ -162,21 +173,22 @@ public class BreastCancerPrediction {
         int distance = 0;
 
         for(BreastCancerCompleteData item: items){
+            // System.out.println("IN Knn" + items.size());
             distance = distanceMetric(item1, item);
-            if(neighbors.size()<k ){
+            if(neighbors.size()<k && distance!=0){
                 neighbors.add(item.getBareNuclei());
                 nuclieDist.put(distance, item.getBareNuclei());
             }    
             else{ 
-                if(Collections.max(nuclieDist.keySet())>distance){
-                    neighbors.remove(neighbors.indexOf(nuclieDist.get(Collections.max(nuclieDist.keySet()))));
+                if(!nuclieDist.keySet().isEmpty() && Collections.max(nuclieDist.keySet())>distance && distance!=0){                    
                     neighbors.add(item.getBareNuclei());
+                    neighbors.remove(neighbors.indexOf(nuclieDist.get(Collections.max(nuclieDist.keySet()))));
                     nuclieDist.put(distance, item.getBareNuclei());
+                    nuclieDist.remove(Collections.max(nuclieDist.keySet()));
                 }
             }
         
         }
-        System.out.println("SIZE1 = " + neighbors.size());
 
         return neighbors;
     }
@@ -186,21 +198,22 @@ public class BreastCancerPrediction {
         int distance = 0;
 
         for(BreastCancerCompleteData item: items){
+            // System.out.println("IN Knn" + items.size());
             distance = distanceMetric(item1, item);
-            if(neighbors.size()<k ){
+            if(neighbors.size()<k && distance!=0){
                 neighbors.add(item.getBareNuclei());
                 nuclieDist.put(distance, item.getBareNuclei());
             }    
             else{ 
-                if(Collections.max(nuclieDist.keySet())>distance){
-                    neighbors.remove(neighbors.indexOf(nuclieDist.get(Collections.max(nuclieDist.keySet()))));
+                if(!nuclieDist.keySet().isEmpty() && Collections.max(nuclieDist.keySet())>distance && distance!=0){                    
                     neighbors.add(item.getBareNuclei());
+                    neighbors.remove(neighbors.indexOf(nuclieDist.get(Collections.max(nuclieDist.keySet()))));
                     nuclieDist.put(distance, item.getBareNuclei());
+                    nuclieDist.remove(Collections.max(nuclieDist.keySet()));
                 }
             }
         
         }
-        System.out.println("SIZE1 = " + neighbors.size());
 
         return neighbors;
     }
@@ -218,44 +231,148 @@ public class BreastCancerPrediction {
         }
         return sum/arr.size();
     }
-    public static ArrayList<BreastCancerCompleteData> cloneList(ArrayList<BreastCancerCompleteData> arr){
-        ArrayList<BreastCancerCompleteData> replica = new ArrayList<>();
-        for(BreastCancerCompleteData item: arr){
-            replica.add(item);
-        }
-        return replica;
-    }
+    // public static ArrayList<BreastCancerCompleteData> cloneList(ArrayList<BreastCancerCompleteData> arr){
+    //     ArrayList<BreastCancerCompleteData> replica = new ArrayList<>();
+    //     for(BreastCancerCompleteData item: arr){
+    //         replica.add(item);
+    //     }
+    //     return replica;
+    // }
     public static double accuracyOfK(int k, ArrayList<BreastCancerCompleteData> trainingSet){
-        ArrayList<BreastCancerCompleteData> replica;
+        ArrayList<BreastCancerCompleteData> replica = new ArrayList<>();
         int known, predicted;
         int sumDiff =0;
+        replica = trainingSet;
         for(BreastCancerCompleteData item: trainingSet){
             known = item.getBareNuclei();
-            
-            replica = cloneList(trainingSet);
-            replica.remove(trainingSet.indexOf(item));
-            predicted = listAverage((kNearestNeighbors(item, replica, k)));
-//            System.out.println("KNOWN = " + known + " PREDICTED = " + predicted);
+            // System.out.println("IN ORIG : " + trainingSet.size());
+            // replica.remove(item);
+            predicted = listAverage(kNearestNeighbors(item, replica, k));
+            // replica.add(item);
+            System.out.println("KNOWN = " + known + " PREDICTED ="+ predicted);
             sumDiff += abs(predicted-known);
         }
-        return sumDiff/trainingSet.size();
+        return sumDiff;
     }
 
     public static int bestK(ArrayList<BreastCancerCompleteData> trainingSet){
         HashMap<Integer, Double> kmap = new HashMap<>();
+        // System.out.println("SIZE IN OG " + trainingSet.size());
         for(int k = 1; k<26; k++){
+            // System.out.println("HELLO");
             kmap.put(k, accuracyOfK(k, trainingSet));
+            System.out.println("K = " + k + " VAL = " + kmap.get(k));
         }
         int k = 1;
         
-        for(Map.Entry<Integer, Double> ele: kmap.entrySet()){
-            System.out.println("K = " + ele.getKey() + " VAL = " + ele.getValue());
-            if(ele.getValue()<kmap.get(k)){
-                k = ele.getKey();
-            }
-        }
+       for(Map.Entry<Integer, Double> ele: kmap.entrySet()){
+//            System.out.println("K = " + ele.getKey() + " VAL = " + ele.getValue());
+           if(ele.getValue()<kmap.get(k)){
+               k = ele.getKey();
+           }
+       }
         return k;
     }
+    public static double pvalueClumpThickness(ArrayList<BreastCancerCompleteData> aa){
+        double tot=0, neg=0;
+        for(BreastCancerCompleteData item: aa){
+            if(item.getClassification()==2){
+                tot++;
+                if(item.getClumpThickness()>5) neg++;
+            }
+        }
+        if(tot==0) return 0;
+        return neg/tot;
+    }
+    public static double pvalueCSizeUni(ArrayList<BreastCancerCompleteData> aa){
+        double tot=0, neg=0;
+        for(BreastCancerCompleteData item: aa){
+            if(item.getClassification()==2){
+                tot++;
+                if(item.getcSizeUni()>5) neg++;
+            }
+        }
+        if(tot==0) return 0;
+        return neg/tot;
+    }
+    public static double pvalueCShapeUni(ArrayList<BreastCancerCompleteData> aa){
+        double tot=0, neg=0;
+        for(BreastCancerCompleteData item: aa){
+            if(item.getClassification()==2){
+                tot++;
+                if(item.getcShapeUni()>5) neg++;
+            }
+        }
+        if(tot==0) return 0;
+        return neg/tot;
+    }
+    public static double pvalueMAdhesion(ArrayList<BreastCancerCompleteData> aa){
+        double tot=0, neg=0;
+        for(BreastCancerCompleteData item: aa){
+            if(item.getClassification()==2){
+                tot++;
+                if(item.getmAdhesion()>5) neg++;
+            }
+        }
+        if(tot==0) return 0;
+        return neg/tot;
+    }
+    public static double pvalueSecs(ArrayList<BreastCancerCompleteData> aa){
+        double tot=0, neg=0;
+        for(BreastCancerCompleteData item: aa){
+            if(item.getClassification()==2){
+                tot++;
+                if(item.getSecs()>5) neg++;
+            }
+        }
+        if(tot==0) return 0;
+        return neg/tot;
+    }
+    public static double pvalueBareNuclei(ArrayList<BreastCancerCompleteData> aa){
+        double tot=0, neg=0;
+        for(BreastCancerCompleteData item: aa){
+            if(item.getClassification()==2){
+                tot++;
+                if(item.getBareNuclei()>5) neg++;
+            }
+        }
+        if(tot==0) return 0;
+        return neg/tot;
+    }
+    public static double pvalueBlandChromatin(ArrayList<BreastCancerCompleteData> aa){
+        double tot=0, neg=0;
+        for(BreastCancerCompleteData item: aa){
+            if(item.getClassification()==2){
+                tot++;
+                if(item.getBlandChromatin()>5) neg++;
+            }
+        }
+        if(tot==0) return 0;
+        return neg/tot;
+    }
+    public static double pvalueNormalNecleoli(ArrayList<BreastCancerCompleteData> aa){
+        double tot=0, neg=0;
+        for(BreastCancerCompleteData item: aa){
+            if(item.getClassification()==2){
+                tot++;
+                if(item.getNormalNucleoli()>5) neg++;
+            }
+        }
+        if(tot==0) return 0;
+        return neg/tot;
+    }
+    public static double pvalueMitoses(ArrayList<BreastCancerCompleteData> aa){
+        double tot=0, neg=0;
+        for(BreastCancerCompleteData item: aa){
+            if(item.getClassification()==2){
+                tot++;
+                if(item.getMitoses()>5) neg++;
+            }
+        }
+        if(tot==0) return 0;
+        return neg/tot;
+    }
+    
 }
 
 

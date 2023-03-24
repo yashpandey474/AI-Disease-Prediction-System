@@ -157,21 +157,21 @@ public class BreastCancerPrediction {
         return -i;
     }
     public static ArrayList<Integer> kNearestNeighbors(BreastCancerCompleteData item1, ArrayList<BreastCancerCompleteData> items, int k){
-        ArrayList<BreastCancerCompleteData> neighbors = new ArrayList<>();
+        ArrayList<Integer> neighbors = new ArrayList<>(); //BARE NUCLEI STORED
+        HashMap<Integer, Integer> nuclieDist = new HashMap<>(); //DISTANCE->BARE NUCLEI
         int distance = 0;
-//        System.out.println("HELLO???");
+
         for(BreastCancerCompleteData item: items){
             distance = distanceMetric(item1, item);
             if(neighbors.size()<k ){
-//                System.out.println("CALLED");
-                neighbors.add(item);
-//                neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
+                neighbors.add(item.getBareNuclei());
+                nuclieDist.put(distance, item.getBareNuclei());
             }    
             else{ 
-                if( Collections.max(neighbors)>dist){
-                    neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
+                if(Collections.max(nuclieDist.keySet())>distance){
+                    neighbors.remove(neighbors.indexOf(nuclieDist.get(Collections.max(nuclieDist.keySet()))));
                     neighbors.add(item.getBareNuclei());
-                    
+                    nuclieDist.put(distance, item.getBareNuclei());
                 }
             }
         
@@ -181,21 +181,30 @@ public class BreastCancerPrediction {
         return neighbors;
     }
     public static ArrayList<Integer> kNearestNeighbors(BreastCancerMissingData item1, ArrayList<BreastCancerCompleteData> items, int k){
-        ArrayList<Integer> neighbors = new ArrayList<>();
+        ArrayList<Integer> neighbors = new ArrayList<>(); //BARE NUCLEI STORED
+        HashMap<Integer, Integer> nuclieDist = new HashMap<>(); //DISTANCE->BARE NUCLEI
         int distance = 0;
-        System.out.println("HELLO???");
+
         for(BreastCancerCompleteData item: items){
             distance = distanceMetric(item1, item);
-            System.out.println("SIZE = " + neighbors.size());
-            if(neighbors.size()<k || Collections.max(neighbors)>distance){
-                System.out.println("ITEM = " + item.getBareNuclei());
+            if(neighbors.size()<k ){
                 neighbors.add(item.getBareNuclei());
-                neighbors.remove(neighbors.indexOf(Collections.max(neighbors)));
+                nuclieDist.put(distance, item.getBareNuclei());
             }    
+            else{ 
+                if(Collections.max(nuclieDist.keySet())>distance){
+                    neighbors.remove(neighbors.indexOf(nuclieDist.get(Collections.max(nuclieDist.keySet()))));
+                    neighbors.add(item.getBareNuclei());
+                    nuclieDist.put(distance, item.getBareNuclei());
+                }
+            }
+        
         }
+        System.out.println("SIZE1 = " + neighbors.size());
 
         return neighbors;
     }
+    
     public static double percent(int a, int b){
         return (a/b)*100;
     }
@@ -248,4 +257,6 @@ public class BreastCancerPrediction {
         return k;
     }
 }
+
+
 

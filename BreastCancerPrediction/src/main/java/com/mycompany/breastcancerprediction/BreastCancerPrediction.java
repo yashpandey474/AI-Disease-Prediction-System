@@ -14,6 +14,8 @@ import java.io.FileNotFoundException;
 import java.util.*;
 import java.lang.*;
 import java.io.*;
+import org.apache.commons.math3.stat.regression.MultipleLinearRegression;
+
 
 public class BreastCancerPrediction {
     
@@ -31,6 +33,8 @@ public class BreastCancerPrediction {
         int k = bestK(alcd);
         System.out.println("K = " + k);
         completeValues(almd, alcd, k);
+        
+        doFeatureSelection(alcd);
     }
     public static void completeValues(ArrayList<BreastCancerMissingData> testing, ArrayList<BreastCancerCompleteData> training, int k){
          ArrayList<BreastCancerCompleteData> replica = training;
@@ -372,7 +376,34 @@ public class BreastCancerPrediction {
         if(tot==0) return 0;
         return neg/tot;
     }
-    
+    public static void doFeatureSelection(ArrayList<BreastCancerCompleteData> alcd){
+        MultipleLinearRegression model = new MultipleLinearRegression();
+        double[][] X = new double[alcd.size()][9];
+        double[] Y = new double[alcd.size()];
+        int i=0;
+        for(BreastCancerCompleteData item : alcd){
+            X[i][0] = item.getClumpThickness();
+            X[i][1] = item.getcSizeUni();
+            X[i][2] = item.getcShapeUni();
+            X[i][3] = item.getmAdhesion();
+            X[i][4] = item.getSecs();
+            X[i][5] = item.getBareNuclei();
+            X[i][6] = item.blandChromatin;
+            X[i][7] = item.getNormalNucleoli();
+            X[i][8] = item.getMitoses(); 
+            Y[i] = item.getClassification();
+            i++;
+        }
+        model.newSampleData(X, Y);
+        double[] pValues = model.getSignificanceLevels();
+        for(int j=0; j<pValues.length; j++){
+           if(pValues[j] > 0.05){
+              // remove the independent variable from the model
+              model.dropXColumn(j);
+            }
+        }
+        model.fit();
+    }
 }
 
 

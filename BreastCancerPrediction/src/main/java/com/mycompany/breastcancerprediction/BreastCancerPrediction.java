@@ -396,8 +396,14 @@ public class BreastCancerPrediction {
         }
         model.newSampleData(X, Y);
         double[] pValues = model.getSignificanceLevels();
+        
+        SimulatedAnnealing.Function f = (double x)->{
+            return 0.05-x;
+        };
+        
+        double limit = SimulatedAnnealing.findMinimum(f, 0.05, 0.075);
         for(int j=0; j<pValues.length; j++){
-           if(pValues[j] > 0.05){
+           if(pValues[j] > limit){
               // remove the independent variable from the model
               model.dropXColumn(j);
             }

@@ -16,6 +16,11 @@
             <artifactId>commons-math4-core</artifactId>
             <version>4.0</version>
         </dependency>
+        <dependency>
+            <groupId>abc</groupId>
+            <artifactId>commons-math3</artifactId>
+            <version>3.6.1</version>
+        </dependency>
     </dependencies>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

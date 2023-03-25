@@ -41,7 +41,5 @@ public class SimulatedAnnealing {
     public interface Function {
         double evaluate(double x);
     }
-    Function f = (double x)->{
-        return 0.05-x;
-    };
+    
 }

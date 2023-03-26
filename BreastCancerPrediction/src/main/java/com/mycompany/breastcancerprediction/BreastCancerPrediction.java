@@ -14,7 +14,10 @@ import java.io.FileNotFoundException;
 import java.util.*;
 import java.lang.*;
 import java.io.*;
-import org.apache.commons.math3.stat.regression.MultipleLinearRegression;
+import org.apache.commons.math3.distribution.TDistribution;
+import org.apache.commons.math3.linear.Array2DRowRealMatrix;
+import org.apache.commons.math3.linear.RealMatrix;
+import org.apache.commons.math3.stat.regression.OLSMultipleLinearRegression;
 
 
 public class BreastCancerPrediction {
@@ -377,7 +380,7 @@ public class BreastCancerPrediction {
         return neg/tot;
     }
     public static void doFeatureSelection(ArrayList<BreastCancerCompleteData> alcd){
-        MultipleLinearRegression model = new MultipleLinearRegression();
+        OLSMultipleLinearRegression model = new OLSMultipleLinearRegression();
         double[][] X = new double[alcd.size()][9];
         double[] Y = new double[alcd.size()];
         int i=0;
@@ -394,21 +397,81 @@ public class BreastCancerPrediction {
             Y[i] = item.getClassification();
             i++;
         }
-        model.newSampleData(X, Y);
-        double[] pValues = model.getSignificanceLevels();
+        model.newSampleData(Y, X);
         
-        SimulatedAnnealing.Function f = (double x)->{
-            return 0.05-x;
-        };
-        
-        double limit = SimulatedAnnealing.findMinimum(f, 0.05, 0.075);
-        for(int j=0; j<pValues.length; j++){
-           if(pValues[j] > limit){
-              // remove the independent variable from the model
-              model.dropXColumn(j);
-            }
+        double[] beta = model.estimateRegressionParameters();
+
+        // Get the residuals by calling estimateResiduals()
+        double[] residuals = model.estimateResiduals();
+
+        // Calculate the variance of the residuals
+        double s2 = 0.0;
+        for (int k = 0; k< residuals.length; k++) {
+            s2 += residuals[k] * residuals[k];
         }
-        model.fit();
+        s2 /= residuals.length - X[0].length;
+
+        // Calculate the standard errors of the regression coefficients
+        double[] stdErrs = new double[X[0].length];
+        for (int k = 0; k < X[0].length; k++) {
+            stdErrs[k] = Math.sqrt(s2 * model.calculateResidualSumOfSquares() / ((X.length - X[0].length) * model.calculateTotalSumOfSquares()));
+        }
+        // Get the predicted values for the input data
+        double[] predicted = predict(X, Y, X);
+
+        // Print the regression coefficients, standard errors, and predicted values
+        System.out.println("Regression coefficients:");
+        for (int k = 0; k < beta.length; k++) {
+            System.out.println("beta_" + k + ": " + beta[k]);
+        }
+        System.out.println("Standard errors:");
+        for (int k = 0; k< stdErrs.length; k++) {
+            System.out.println("se_" + k+ ": " + stdErrs[k]);
+        }
+        System.out.println("Predicted values:");
+        for (int k = 0; k < predicted.length; k++) {
+            System.out.println("y_" + k + ": " + predicted[k]);
+        }
+//        double[] stdErrs = model.getPartialRegressionCoefficientsStdErrors();
+//        double[] pValues = model.getSignificanceLevels();
+//        
+//        double[] se = model.estimateRegressionParametersStandardErrors();
+//        RealMatrix Xt = new Array2DRowRealMatrix(model.getRegresors());
+//        int n = Xt.getRowDimension();
+//        TDistribution tDist = new TDistribution(n - X[0].length - 1);
+//        double[] pValues = new double[beta.length];
+//        for (int k = 0; k < beta.length; k++) {
+//            double tStat = beta[k] / se[k];
+//            pValues[k] = 2 * tDist.cumulativeProbability(-Math.abs(tStat));
+//        }
+//        SimulatedAnnealing.Function f = (double x)->{
+//            return 0.05-x;
+//        };
+//        
+//        double limit = SimulatedAnnealing.findMinimum(f, 0.05, 0.075);
+//        for(int j=0; j<pValues.length; j++){
+//           if(pValues[j] > limit){
+//              // remove the independent variable from the model
+//              model.dropXColumn(j);
+//            }
+//        }
+//        model.fit();
+    }
+    public static double[] predict(double[][] X, double[] Y, double[][] newX) {
+        OLSMultipleLinearRegression model = new OLSMultipleLinearRegression();
+        model.newSampleData(Y, X);
+        double[] beta = model.estimateRegressionParameters();
+        int n = newX.length;
+        double[] predictions = new double[n];
+        for (int i = 0; i < n; i++) {
+            double[] x = newX[i];
+            double yHat = beta[0];
+            for (int j = 0; j < x.length; j++) {
+                yHat += beta[j + 1] * x[j];
+            }
+            predictions[i] = yHat;
+        }
+        return predictions;
     }
 }
 

@@ -432,30 +432,49 @@ public class BreastCancerPrediction {
         for (int k = 0; k < predicted.length; k++) {
             System.out.println("y_" + k + ": " + predicted[k]);
         }
-//        double[] stdErrs = model.getPartialRegressionCoefficientsStdErrors();
-//        double[] pValues = model.getSignificanceLevels();
-//        
-//        double[] se = model.estimateRegressionParametersStandardErrors();
-//        RealMatrix Xt = new Array2DRowRealMatrix(model.getRegresors());
-//        int n = Xt.getRowDimension();
-//        TDistribution tDist = new TDistribution(n - X[0].length - 1);
-//        double[] pValues = new double[beta.length];
-//        for (int k = 0; k < beta.length; k++) {
-//            double tStat = beta[k] / se[k];
-//            pValues[k] = 2 * tDist.cumulativeProbability(-Math.abs(tStat));
-//        }
-//        SimulatedAnnealing.Function f = (double x)->{
-//            return 0.05-x;
-//        };
-//        
-//        double limit = SimulatedAnnealing.findMinimum(f, 0.05, 0.075);
-//        for(int j=0; j<pValues.length; j++){
-//           if(pValues[j] > limit){
-//              // remove the independent variable from the model
-//              model.dropXColumn(j);
-//            }
-//        }
-//        model.fit();
+        
+        double[] pValues = getPvalues(X, Y);
+        SimulatedAnnealing.Function f = (double x)->{
+            return 0.05-x;
+        };
+        
+        double limit = SimulatedAnnealing.findMinimum(f, 0.05, 0.075);
+        for(int j=0; j<pValues.length; j++){
+           if(pValues[j] > limit){
+              // remove the independent variable from the model
+              //model.dropXColumn(j);
+              double [][] temp = X;
+              X = new double[temp.length][temp[0].length-1];
+              for(int m=0; m<temp.length; m++){
+                  for(int n=0, w=0; n<temp[0].length; n++){
+                      if(n!=j){
+                          X[m][w++] = temp[m][n];
+                      }
+                  }
+              }
+            }
+        }
+        model.newSampleData(Y, X);
+        
+        beta = model.estimateRegressionParameters();
+
+        // Get the residuals by calling estimateResiduals()
+        residuals = model.estimateResiduals();
+
+        // Calculate the variance of the residuals
+        s2 = 0.0;
+        for (int k = 0; k< residuals.length; k++) {
+            s2 += residuals[k] * residuals[k];
+        }
+        s2 /= residuals.length - X[0].length;
+
+        // Calculate the standard errors of the regression coefficients
+        stdErrs = new double[X[0].length];
+        for (int k = 0; k < X[0].length; k++) {
+            stdErrs[k] = Math.sqrt(s2 * model.calculateResidualSumOfSquares() / ((X.length - X[0].length) * model.calculateTotalSumOfSquares()));
+        }
+        // Get the predicted values for the input data
+        predicted = predict(X, Y, X);
     }
     public static double[] predict(double[][] X, double[] Y, double[][] newX) {
         OLSMultipleLinearRegression model = new OLSMultipleLinearRegression();
@@ -472,6 +491,21 @@ public class BreastCancerPrediction {
             predictions[i] = yHat;
         }
         return predictions;
+    }
+    public static double[] getPvalues(double[][] X, double[] Y) {
+        CustomOLS model = new CustomOLS();
+        model.newSampleData(Y, X);
+        double[] beta = model.estimateRegressionParameters();
+        double[] se = model.estimateRegressionParametersStandardErrors();
+        double[][] Xt = model.getDesignMatrix();
+        int n = Xt.length;
+        TDistribution tDist = new TDistribution(n - X[0].length - 1);
+        double[] pValues = new double[beta.length];
+        for (int i = 0; i < beta.length; i++) {
+            double tStat = beta[i] / se[i];
+            pValues[i] = 2 * tDist.cumulativeProbability(-Math.abs(tStat));
+        }
+        return pValues;
     }
 }
 

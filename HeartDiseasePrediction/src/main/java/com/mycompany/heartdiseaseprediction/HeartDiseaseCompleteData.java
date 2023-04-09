@@ -4,10 +4,6 @@
  */
 package com.mycompany.heartdiseaseprediction;
 
-/**
- *
- * @author ohidu
- */
 public class HeartDiseaseCompleteData{
     double age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca, thal;
     int num;

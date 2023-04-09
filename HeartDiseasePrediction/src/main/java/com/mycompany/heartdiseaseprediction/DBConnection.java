@@ -19,7 +19,7 @@ public class DBConnection {
             Class.forName("com.mysql.cj.jdbc.Driver"); 
             String databaseName = "hdp";
             String username = "root";
-            String password = "rootpass";
+            String password = "yash2003";
 
             String url = "jdbc:mysql://localhost:3306/mysql?zeroDateTimeBehavior=CONVERT_TO_NULL";
             Connection conn = DriverManager.getConnection(url,username, password);
@@ -48,7 +48,7 @@ public class DBConnection {
         String driver = "com.mysql.cj.jdbc.Driver";
         String url = "jdbc:mysql://localhost:3306/hdp";
         String username = "root";
-        String password = "rootpass";
+        String password = "yash2003";
         try{
             Class.forName(driver);
             Connection conn = DriverManager.getConnection(url,username,password);
@@ -68,6 +68,11 @@ public class DBConnection {
             qw.setString(1, "hdp");
             qw.setString(2, "heartdata");
             ResultSet r = qw.executeQuery();
+            if(r.next()){
+                String sss = "drop table heartdata;";
+                PreparedStatement ppp = con.prepareStatement(sss);
+                ppp.executeUpdate();
+            }
             if(!r.next()){
                String sq = "create table heartdata ("
                        + "age numeric(10,2), "

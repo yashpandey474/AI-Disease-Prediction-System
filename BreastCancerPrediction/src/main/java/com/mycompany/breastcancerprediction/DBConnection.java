@@ -19,7 +19,7 @@ public class DBConnection {
             Class.forName("com.mysql.cj.jdbc.Driver"); 
             String databaseName = "bcp";
             String username = "root";
-            String password = "rootpass";
+            String password = "yash2003";
 
             String url = "jdbc:mysql://localhost:3306/mysql?zeroDateTimeBehavior=CONVERT_TO_NULL";
             Connection conn = DriverManager.getConnection(url,username, password);
@@ -48,7 +48,7 @@ public class DBConnection {
         String driver = "com.mysql.cj.jdbc.Driver";
         String url = "jdbc:mysql://localhost:3306/bcp";
         String username = "root";
-        String password = "rootpass";
+        String password = "yash2003";
         try{
             Class.forName(driver);
             Connection conn = DriverManager.getConnection(url,username,password);

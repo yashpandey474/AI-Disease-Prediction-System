@@ -33,9 +33,155 @@ import org.apache.commons.math3.stat.regression.OLSMultipleLinearRegression;
 
 public class HeartDiseasePrediction {
     private static final double INITIAL_TEMPERATURE = 1000;
-    private static final double COOLING_RATE = 0.003;
+    private static final double COOLING_RATE = 0.03;
     private static final int ITERATIONS_PER_TEMPERATURE = 100;
 
+    public static void main(String[] args) {
+        DBConnection.createDatabase();
+        DBConnection.createHeartDiseaseData();
+        readAndAddData();
+        
+
+        // SET OF RECORDS WHICH HAVE A MISSING VALUE FOR CA ATTRIBUTE OR THAL ATTRIBUTE OR BOTH
+        ArrayList<HeartDiseaseMissingData> almd = new ArrayList<HeartDiseaseMissingData>();
+        // SET OF COMPLETE RECORDS - WITH NO MISSING VALUES
+        ArrayList<HeartDiseaseCompleteData> alcd = new ArrayList<HeartDiseaseCompleteData>();
+        // READ THE RECORDS FROM PROCESSED.CLEVELAND FILE
+        readMissingAndCompleteData(almd, alcd);
+        
+
+        // FIND THE VALUE OF K WITH HIGHEST ACCURACY FOR KNN DATA MUNGING ON CA & THAL ATTRIBUTE - BASED ON COMPLETE SET OF RECORDS
+        int k1 = bestK_ca(alcd);
+        int k2 = bestK_thal(alcd);
+
+        // FIND MEAN SQUARED ERROR & SUM OF SQUARED DIFFERENCES BETWEEN KNOWN & PREDICTED VALUES WHEN REPLACING VALUES OF BARE NUCLEI WITH MEAN
+        completeByMeanError(alcd);
+
+    // COMPLETE MISSING VALUED IN ALMD BY KNN - ADDING TCOMPLETE RECORDS TO ALCD
+        completeValues(almd, alcd, k1, k2);
+
+    // ALTERNATE - COMPLETE MISSING VALUES IN ALMD BY REPLACING WITH MEAN
+        completeValuesMean(alcd, almd);
+
+
+            // PRINTING P -VALUES OF ATTRIBUTES
+            printPValues(alcd);
+
+        // FEATURE SELECTION BASED ON A SIGNIFICANCE LIMIT OF P-VALUE - NO SIMULATED ANNEALING
+        normalFeatureSelection(alcd, 0.05); // CHECK THE ACCURACIES BY CROSS VALIDATION & DIRECT CALCULATION OF 0.05 OR O.068
+        
+        // FEATURE SELECTION BASED ON SIMULATED ANNEALING WITH VALUES RANGING FROM LOWER BOUND TO UPPER BOUND
+        doFeatureSelection(alcd,  0.05, 0.7);
+
+        // PLOT LEARNING CURVE - WITH TRAINING SIZE AND ACCURACY
+        plotLearningCurve(alcd);
+
+        // FIND BEST VALUE OF K FOR KNN OF DIAGNOSIS PREDICTION - ON NUMS ATTRIBUTE
+        int bestK = bestKPredict(alcd);
+
+
+
+        
+    }
+    public static int pluralityTest(ArrayList<Integer> neighbors){
+        int count0 = 0;
+        int count1 = 0;
+        for (int i : neighbors) {
+            if (i == 0) {
+                count0++;
+            } else if (i >= 1) {
+                count1++;
+            }
+        }
+        
+    // Return the predicted classification based on the plurality test
+            if (count1 >= count0) {
+                return 1;
+            } 
+            return 0;
+    }
+    public static int PredictdistanceMetric(HeartDiseaseCompleteData item1, HeartDiseaseCompleteData item2){
+        //ASSUMING ITEM1 HAS THE MISSING DATA IN 6TH INDEX
+        int diff = 0;
+        diff += abs(item1.getAge() - item2.getAge());
+        diff += abs(item1.getChol() - item2.getChol());
+        diff += abs(item1.getCp() - item2.getCp());
+        diff += abs(item1.getExang()- item2.getExang());
+        diff += abs(item1.getFbs() - item2.getFbs());
+        diff += abs(item1.getOldpeak() - item2.getOldpeak());
+        diff += abs(item1.getRestecg() - item2.getRestecg());
+        diff += abs(item1.getThal() - item2.getThal());
+        diff += abs(item1.getCa() - item2.getCa());
+        diff += abs(item1.getSex() - item2.getSex());
+        diff += abs(item1.getSlope() - item2.getSlope());
+        diff += abs(item1.getThalach() - item2.getThalach());
+        diff += abs(item1.getTrestbps() - item2.getTrestbps());
+        return diff;
+    }
+    public static int PredictkNearestNeighbors(HeartDiseaseCompleteData item1, ArrayList<HeartDiseaseCompleteData> items, int k){
+        ArrayList<Integer> neighbors = new ArrayList<>(); //CLASSIFICATION STORED
+        HashMap<Integer, Integer> classfDist = new HashMap<>(); //DISTANCE->INDEX IN NEIGHBORS
+        int distance = 0;
+
+        for(HeartDiseaseCompleteData item: items){
+            // System.out.println("In Knn" + items.size());
+            //PROBLEM: NEIGHBORS REMOVES FIRST OCCURENCE INSTEAD OF THAT ITEM WITH LARGEST INDEX: SOLN = STORE INDEX, NOT CLASSIFICATION
+            distance = PredictdistanceMetric(item1, item);
+            if(neighbors.size()<k && distance!=0){
+                neighbors.add(item.getNum());
+                classfDist.put(distance, item.getNum());
+            }    
+            else{ 
+                if(!classfDist.keySet().isEmpty() && Collections.max(classfDist.keySet())>distance && distance!=0){                    
+                    neighbors.add(item.getNum());
+                    neighbors.remove(neighbors.indexOf(classfDist.get(Collections.max(classfDist.keySet()))));
+                    classfDist.put(distance, item.getNum());
+                    classfDist.remove(Collections.max(classfDist.keySet()));
+                }
+            }
+        
+        }
+
+        //PLURALITY TEST
+        return pluralityTest(neighbors);
+
+
+    }
+    public static double accuracyOfKPredict(int k, ArrayList<HeartDiseaseCompleteData> alcd){
+        int correctPredictions =0;
+        int totalCount = alcd.size();
+        for(HeartDiseaseCompleteData item: alcd){
+            //Actual value of bare nuclie
+            int known = item.getNum();
+            //Predicted value using passed k
+            int predicted = PredictkNearestNeighbors(item, alcd, k);
+            //Add squared difference
+            if (known == 0 && predicted == 0 || known >= 1 && predicted >= 1){
+                correctPredictions++;
+            }
+            
+        }
+        // System.out.println("SIZE IN K = " + totalCount);
+        return (correctPredictions/(double)totalCount)*100;
+    }
+    //DOCUMENTED//
+    public static int bestKPredict(ArrayList<HeartDiseaseCompleteData> alcd){
+        System.out.println("NO OF RECORDS = " + alcd.size());
+        HashMap<Integer, Double> kmap = new HashMap<>();
+        System.out.println("\n\n\n ACCURACIES OF KNN \n\n");
+        for(int k = 2; k<30; k++){
+            kmap.put(k, accuracyOfKPredict(k, alcd));
+            System.out.println( kmap.get(k));
+        }
+    
+        int bestK = 2;
+        for(Map.Entry<Integer, Double> ele: kmap.entrySet()){
+            if(ele.getValue() > kmap.get(bestK)){
+                bestK = ele.getKey();
+            }
+        }
+        return bestK;
+    }
     public static double[] predict(double[][] X, double[] Y, double[][] newX) {
         OLSMultipleLinearRegression model = new OLSMultipleLinearRegression();
         model.newSampleData(Y, X);
@@ -156,31 +302,7 @@ public class HeartDiseasePrediction {
 
 }
 
-    public static void main(String[] args) {
-        DBConnection.createDatabase();
-        DBConnection.createHeartDiseaseData();
-        readAndAddData();
-        
-        ArrayList<HeartDiseaseMissingData> almd = new ArrayList<HeartDiseaseMissingData>();
-        ArrayList<HeartDiseaseCompleteData> alcd = new ArrayList<HeartDiseaseCompleteData>();
-        readMissingAndCompleteData(almd, alcd);
-        
-        int k1 = bestK_ca(alcd);
-        int k2 = bestK_thal(alcd);
-
-        
-        // System.out.println("CA K = " + k1 + " THAL K = " + k2);
-        
-        //USE K1 AND K2 TO CREATE
-        // completeByMeanError(alcd);
-        completeValues(almd, alcd, k1, k2);
-        normalFeatureSelection(alcd);
-        // printPValues(alcd);
-        // getDistribution(alcd, almd);
-        // completeValues(almd, alcd, k1, k2);
-        
-    }
-
+    
     public static void getDistribution(ArrayList<HeartDiseaseCompleteData> dataList, ArrayList<HeartDiseaseMissingData> almd){
             int numMales = 0;
             int numFemales = 0;
@@ -625,36 +747,123 @@ public class HeartDiseasePrediction {
         System.out.println("THAL: BEST K = " + k + " WITH MSE = " + kmap.get(k));
         return k;
     }
-    /* 
-    (item1.getAge() - item2.getAge());
-    diff += abs(item1.getChol() - item2.getChol());
-    diff += abs(item1.getCp() - item2.getCp());
-    diff += abs(item1.getExang()- item2.getExang());
-    diff += abs(item1.getFbs() - item2.getFbs());
-    diff += abs(item1.getNum() - item2.getNum());
-    diff += abs(item1.getOldpeak() - item2.getOldpeak());
-    diff += abs(item1.getRestecg() - item2.getRestecg());
-    diff += abs(item1.getSex() - item2.getSex());
-    diff += abs(item1.getSlope() - item2.getSlope());
-    diff += abs(item1.getThalach() - item2.getThalach());
-    diff += abs(item1.getTrestbps() - item2.getTrestbps());
-
-*/
+//DOCUMENTED//
 public static double calculateAccuracy(double[] yTrue, double[] yPred) {
     int n = yTrue.length;
     int correctPredictions = 0;
 
     for (int i = 0; i < n; i++) {
-        if (yTrue[i] == yPred[i]) {
-            correctPredictions++;
+        if((yTrue[i] == 0 && yPred[i] == 0) || (yTrue[i] >=1 && yPred[i] == 1)){
+            correctPredictions ++;
+
         }
-        System.out.println("TRUE = " + yTrue[i] + " Predicted = " + yPred[i]);
+        // System.out.println("TRUE = " + (yTrue[i]>=1?1:0) + " Predicted = " + yPred[i]);
     }
 
     double accuracy = (double) correctPredictions / n;
     return accuracy;
 }
-public static void normalFeatureSelection(ArrayList<HeartDiseaseCompleteData> alcd){
+//DOCUMENTED//
+public static void plotLearningCurve(ArrayList<HeartDiseaseCompleteData> alcd){
+    OLSMultipleLinearRegression model = new OLSMultipleLinearRegression();
+    double[][] X = new double[alcd.size()][12];
+    double[] Y = new double[alcd.size()];
+    int i1=0;
+    for(HeartDiseaseCompleteData item : alcd){
+        X[i1][0] = item.getAge();
+        X[i1][1] = item.getChol();
+        X[i1][2] = item.getCp();
+        X[i1][3] = item.getExang();
+        X[i1][4] = item.getFbs();
+        X[i1][5] = item.getThal();
+        X[i1][6] = item.getOldpeak();
+        X[i1][7] = item.getRestecg();
+        X[i1][8] = item.getSex(); 
+        X[i1][9] = item.getSlope();
+        X[i1][10] = item.getThalach();
+        X[i1][11] = item.getTrestbps();
+        Y[i1] = item.getNum();
+        i1++;
+    }
+    model.newSampleData(Y, X);
+    // Define the range of the training set sizes to be tested
+
+    int[] trainSizes = {20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170,
+    180, 190, 200, 210, 220, 230, 240, 250, 260, 270, 280, 290, 300};
+    System.out.println("LENGTH OF X = " + X.length);
+        // Define arrays to store the accuracy and training set sizes
+        double[] accuracy = new double[trainSizes.length];
+        double[] trainSetSizes = new double[trainSizes.length];
+
+        /* REMOVED SHUFFLING AS RESULTS WERE VARIED */
+        // shuffle(X, Y);
+        // Loop over the training set sizes
+        for (int i = 0; i < trainSizes.length; i++) {
+            int trainSize = trainSizes[i];
+            trainSetSizes[i] = trainSize;
+            double[][] X_train = new double[trainSize][X[0].length];
+            double[][] X_test = new double[X.length - trainSize][X[0].length];
+            double[] Y_train = new double[trainSize];
+            double[] Y_test = new double[X.length - trainSize];
+            int trainIdx = 0;
+            int testIdx = 0;
+
+            // Split the data into training and testing sets
+            for (int j = 0; j < X.length; j++) {
+                if (j < trainSize) {
+                    // add data point to training set
+                    X_train[trainIdx] = X[j];
+                    Y_train[trainIdx] = Y[j];
+                    trainIdx++;
+                } else {
+                    // add data point to testing set
+                    X_test[testIdx] = X[j];
+                    Y_test[testIdx] = Y[j];
+                    testIdx++;
+                }
+            }
+
+            // Train model on training set  
+            model.newSampleData(Y_train, X_train);
+            double[] beta = model.estimateRegressionParameters();
+            double[] residuals = model.estimateResiduals();
+
+            // Calculate the variance of the residuals
+            double s2 = 0.0;
+            for (int k1 = 0; k1 < residuals.length; k1++) {
+                s2 += residuals[k1] * residuals[k1];
+            }
+            s2 /= residuals.length - X[0].length;
+
+            // Calculate the standard errors of the regression coefficients
+            double[] stdErrs = new double[X[0].length];
+            for (int k1 = 0; k1 < X[0].length; k1++) {
+                stdErrs[k1] = Math.sqrt(s2 * model.calculateResidualSumOfSquares() / ((X.length - X[0].length) * model.calculateTotalSumOfSquares()));
+            }
+
+            // Test model on testing set
+            double[] predicted = predict(X_train, Y_train, X_test);
+
+            for(int i2 = 0; i2<predicted.length; i2++){
+                if (predicted[i2]<0.5){
+                    predicted[i2] = 0;
+                }
+                else if(predicted[i2]>= 0.5){
+                    predicted[i2] = 1;
+                }
+                
+            }
+            // Calculate accuracy of model on testing set
+            accuracy[i] = calculateAccuracy(Y_test, predicted);
+        }
+
+        // Plot the learning curve
+        for(int i = 0; i<trainSizes.length; i++){
+            System.out.println( accuracy[i]);
+        }
+    }
+//DOCUMENTED//
+public static void normalFeatureSelection(ArrayList<HeartDiseaseCompleteData> alcd, double limit){
         OLSMultipleLinearRegression model = new OLSMultipleLinearRegression();
         double[][] X = new double[alcd.size()][12];
         double[] Y = new double[alcd.size()];
@@ -677,7 +886,7 @@ public static void normalFeatureSelection(ArrayList<HeartDiseaseCompleteData> al
         }
         model.newSampleData(Y, X);
         double[] pValues = getPvalues(X, Y);
-        double currentSolution = 0.05;
+        double currentSolution = limit;
         for(int j = 0; j < pValues.length;j++ ) {
             if(pValues[j] > currentSolution) {
                 // remove the j-th column from the X matrix
@@ -693,7 +902,7 @@ public static void normalFeatureSelection(ArrayList<HeartDiseaseCompleteData> al
                 }
                 X = temp; // update X matrix with the new one without the j-th column
                 pValues = getPvalues(X, Y);
-                j = 0; // recalculate p-values
+                j = 0; // reevaluate p-values
             }
         }
             
@@ -715,12 +924,25 @@ public static void normalFeatureSelection(ArrayList<HeartDiseaseCompleteData> al
         }
         // Get the predicted values for the input data
         double[] predicted = predict(X, Y, X);
-
+        for(int i1 = 0; i1<predicted.length; i1++){
+            if (predicted[i1]<0.5){
+                predicted[i1] = 0;
+            }
+            else if(predicted[i1]>= 0.5){
+                predicted[i1] = 1;
+            }
+            
+        }
+        double[] temp = new double[alcd.size()];
+        for(int i1 = 0; i1<alcd.size(); i1++){
+            temp[i1] = Y[i1];
+        }
         double accuracy = crossValidation(X,Y);
-        double accuracy1 = calculateAccuracy(Y, predicted);
+        double accuracy1 = calculateAccuracy(temp, predicted);
         System.out.println("P-value = 0.05 Accuracy = " + accuracy);
         System.out.println("P-value = 0.05 Direct Accuracy = " + accuracy1);        
     }
+    //DOCUMENTED//
     public static double acceptanceProbability(double currentEnergy, double newEnergy, double temperature) {
         // If the new solution is better than the current solution, accept it
         if (newEnergy < currentEnergy) {
@@ -728,7 +950,7 @@ public static void normalFeatureSelection(ArrayList<HeartDiseaseCompleteData> al
         }
         
         // Calculate the probability of accepting a worse solution based on the temperature and energy difference
-        return Math.exp((currentEnergy - newEnergy) / temperature);
+        return Math.exp((currentEnergy-newEnergy) / temperature);
     }
     public static void printPValues(ArrayList<HeartDiseaseCompleteData> alcd){
         OLSMultipleLinearRegression model = new OLSMultipleLinearRegression();
@@ -760,9 +982,10 @@ public static void normalFeatureSelection(ArrayList<HeartDiseaseCompleteData> al
         }
         System.out.println("\n\nEnd of P-values");
     }
-    public static void doFeatureSelection(ArrayList<HeartDiseaseCompleteData> alcd){
+    public static void doFeatureSelection(ArrayList<HeartDiseaseCompleteData> alcd, double lowerBoundValue, double upperBoundValue){
         OLSMultipleLinearRegression model = new OLSMultipleLinearRegression();
         double[][] X = new double[alcd.size()][12];
+        double[][] X1 = new double[alcd.size()][12]; /* COPY OF X FOR REINITIALISATION AFTER EACH ITERATION */
         double[] Y = new double[alcd.size()];
         int i=0;
         for(HeartDiseaseCompleteData item : alcd){
@@ -778,6 +1001,20 @@ public static void normalFeatureSelection(ArrayList<HeartDiseaseCompleteData> al
             X[i][9] = item.getSlope();
             X[i][10] = item.getThalach();
             X[i][11] = item.getTrestbps();
+            
+            X1[i][0] = item.getAge();
+            X1[i][1] = item.getChol();
+            X1[i][2] = item.getCp();
+            X1[i][3] = item.getExang();
+            X1[i][4] = item.getFbs();
+            X1[i][5] = item.getThal();
+            X1[i][6] = item.getOldpeak();
+            X1[i][7] = item.getRestecg();
+            X1[i][8] = item.getSex(); 
+            X1[i][9] = item.getSlope();
+            X1[i][10] = item.getThalach();
+            X1[i][11] = item.getTrestbps();
+
             Y[i] = item.getNum();
             i++;
         }
@@ -806,10 +1043,11 @@ public static void normalFeatureSelection(ArrayList<HeartDiseaseCompleteData> al
         
         double[] pValues = getPvalues(X, Y);
 
-        double lowerBound = 0.05;
-        double upperBound =  0.075;
+        double lowerBound = lowerBoundValue;
+        double upperBound =  upperBoundValue;
+        
         Random random = new Random();
-        double currentSolution = random.nextDouble() * (upperBound - lowerBound) + lowerBound;
+        double currentSolution = upperBoundValue;
         double temperature = INITIAL_TEMPERATURE;
         HashMap<Double, Double> pvalAccuracy = new HashMap<>();
         while (temperature > 1) {
@@ -819,8 +1057,10 @@ public static void normalFeatureSelection(ArrayList<HeartDiseaseCompleteData> al
                 if (acceptanceProbability > random.nextDouble()) {
                     currentSolution = newSolution;
                 }
-                for(int j = 0; j < pValues.length;j++ ) {
-                    if(pValues[j] > currentSolution) {
+                int e = 0;
+                for(int j = 0; j<pValues.length;j++ ) {
+                    if(pValues[j]>currentSolution) {
+                        // System.out.println("ATTRIBUTE ELIMINATED " + pValues[j]);
                         // remove the j-th column from the X matrix
                         double[][] temp = new double[X.length][X[0].length - 1];
                         for(int m = 0; m < X.length; m++) {
@@ -832,10 +1072,10 @@ public static void normalFeatureSelection(ArrayList<HeartDiseaseCompleteData> al
                                 }
                             }
                         }
+                        j=0;
                         X = temp; // update X matrix with the new one without the j-th column
                         pValues = getPvalues(X, Y); // recalculate p-values
                     }
-                    
                 }
                 model.newSampleData(Y, X);
                 beta = model.estimateRegressionParameters();
@@ -854,15 +1094,33 @@ public static void normalFeatureSelection(ArrayList<HeartDiseaseCompleteData> al
                 }
                 // Get the predicted values for the input data
                 predicted = predict(X, Y, X);
-
+                for(int i1 = 0; i1<predicted.length; i1++){
+                    if (predicted[i1]<0.5){
+                        predicted[i1] = 0;
+                    }
+                    else if(predicted[i1]>= 0.5){
+                        predicted[i1] = 1;
+                    }
+                    
+                }
                 //FIND ACCURACY
                 double accuracy = calculateAccuracy(Y,predicted);
-                System.out.println("P-values = " + currentSolution  + " Accuracy = " + accuracy); 
+                // System.out.println("P-value = " + currentSolution  + " Accuracy = " + accuracy); 
                 pvalAccuracy.put(currentSolution, accuracy);
                 temperature *= 1 - COOLING_RATE;
+                X = X1;
+                pValues  = getPvalues(X, Y);
         }
         double pval = 0;
         double accuracy = 0;
+        System.out.println("\n\n\n P-VALUES USED \n\n\n");
+        for(Map.Entry<Double, Double> entry: pvalAccuracy.entrySet()){
+            System.out.println(entry.getKey());
+        }
+        System.out.println("\n\n\n ACCURACIES OBTAINED \n\n\n");
+        for(Map.Entry<Double, Double> entry: pvalAccuracy.entrySet()){
+            System.out.println(entry.getValue());
+        }
         for(Map.Entry<Double, Double> entry: pvalAccuracy.entrySet()){
             if(entry.getValue() > accuracy){
                 accuracy = entry.getValue();

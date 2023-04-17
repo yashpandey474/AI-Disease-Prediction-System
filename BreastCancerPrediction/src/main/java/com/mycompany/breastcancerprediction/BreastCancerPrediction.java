@@ -13,16 +13,18 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.*;
 import java.lang.*;
+import java.lang.reflect.Array;
 import java.io.*;
 import org.apache.commons.math3.distribution.TDistribution;
 import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.apache.commons.math3.linear.RealMatrix;
+import org.apache.commons.math3.ode.nonstiff.AdamsNordsieckTransformer;
 import org.apache.commons.math3.stat.regression.OLSMultipleLinearRegression;
 
 
 public class BreastCancerPrediction {
     private static final double INITIAL_TEMPERATURE = 1000;
-    private static final double COOLING_RATE = 0.003;
+    private static final double COOLING_RATE = 0.03;
     private static final int ITERATIONS_PER_TEMPERATURE = 100;
 
     public static void main(String[] args) {
@@ -31,25 +33,45 @@ public class BreastCancerPrediction {
         DBConnection.createBreastCancerData();
         readAndAddData();
         
-        ArrayList<BreastCancerMissingData> almd = new ArrayList<BreastCancerMissingData>();
-        ArrayList<BreastCancerCompleteData> alcd = new ArrayList<BreastCancerCompleteData>();
-        readMissingAndCompleteData(almd, alcd);
-        //TESTING = ALMD
-        // System.out.println("MISSING = " + almd.size());
-        //TRAINING = ALCD
 
-        // doFeatureSelection(alcd
-        int predictK = bestKPredict(alcd);
-        System.out.println("OPTIMAL K FOR PREDICTION: " + predictK);
-        //Finding best value of K for KNN
-        // int k = bestK(alcd);
-        // completeByMeanError(alcd);
-        // System.out.println("K = " + k);
-        // //Completing values based on KNN
-        // completeValues(almd, alcd, k);
-        // normalFeatureSelection(alcd);
+
+     // FORMING THE SET OF RECORDS WITH MISSING DATA IN BARE NUCLEI FIELD
+        ArrayList<BreastCancerMissingData> almd = new ArrayList<BreastCancerMissingData>();
+    // FORMING THE SET OF RECORDS WITH COMPLETE DATA - NO MISSING VALUES
+        ArrayList<BreastCancerCompleteData> alcd = new ArrayList<BreastCancerCompleteData>();
+    // READING DATA FROM BREAST-CANCER-WINSCONCIN FILE
+        readMissingAndCompleteData(almd, alcd);
+
+    // FINDING BEST VALUE OF K FOR KNN - DATA MUNGING OF BARE NUCLEI FIELD 
+        int k = bestK(alcd);
         
-        // doFeatureSelection(alcd);
+    // FIND MEAN SQUARED ERROR & SUM OF SQUARED DIFFERENCES BETWEEN KNOWN & PREDICTED VALUES WHEN REPLACING VALUES OF BARE NUCLEI WITH MEAN
+        completeByMeanError(alcd);
+
+    // COMPLETE MISSING VALUED IN ALMD BY KNN - ADDING TCOMPLETE RECORDS TO ALCD
+        completeValues(almd, alcd, k);
+
+    // ALTERNATE - COMPLETE MISSING VALUES IN ALMD BY REPLACING WITH MEAN
+        completeValuesMean(alcd, almd);
+
+    // PRINTING P -VALUES OF ATTRIBUTES
+        printPValues(alcd);
+
+    // FEATURE SELECTION BASED ON A P-VALUE SIGNIGFICANCE LIMIT [NO SIMULATED ANNEALING. USED TO TEST ACCURACY FOR 0.05 & 0.005 SEPARATELY]
+        normalFeatureSelection(alcd, 0.05);
+
+    // FEATURE SELECTION USING SIMULATED ANNEALING TO FIND P-VALUE WITH BEST ACCURACY IN A GIVEN RANGE
+        doFeatureSelection(alcd, 0.001, 0.3);
+    
+    // LEARNING CURVE - VALUES OF ACCURACIES FOR DIFFERENT TRAINING SIZES - USE TO PLOT GRAPH
+        plotLearningCurve(alcd);
+
+    // FIND BEST VALUE OF K FOR KNN OF DIAGNOSIS PREDICTION - ON NUMS ATTRIBUTE
+        int bestK = bestKPredict(alcd);
+
+    
+
+    
     }
     public static int listAverage(ArrayList<Integer> arr){
         int sum = 0;
@@ -116,6 +138,7 @@ public class BreastCancerPrediction {
         }
         sc.close();
     }
+    //DOCUMENTED//
     public static void readMissingAndCompleteData(ArrayList<BreastCancerMissingData> almd, ArrayList<BreastCancerCompleteData> alcd){
         Connection con = DBConnection.getConnection();
         try{
@@ -161,7 +184,7 @@ public class BreastCancerPrediction {
         }
     }
 
-
+    //DOCUMENTED//
     public static int distanceMetric(BreastCancerCompleteData item1, BreastCancerCompleteData item2){
         //ASSUMING ITEM1 HAS THE MISSING DATA IN 6TH INDEX
         int diff = 0;
@@ -191,7 +214,7 @@ public class BreastCancerPrediction {
         return diff;
     }
 
-    
+    //DOCUMENTED//
     public static ArrayList<Integer> kNearestNeighbors(BreastCancerCompleteData item1, ArrayList<BreastCancerCompleteData> items, int k){
         ArrayList<Integer> neighbors = new ArrayList<>(); //BARE NUCLEI STORED
         HashMap<Integer, Integer> nuclieDist = new HashMap<>(); //DISTANCE->BARE NUCLEI
@@ -253,7 +276,6 @@ public class BreastCancerPrediction {
         //ASSUMING ITEM1 HAS THE MISSING DATA IN 6TH INDEX
         int diff = 0;
         diff += abs(item1.getBlandChromatin() - item2.getBlandChromatin());
-        diff += abs(item1.getClassification() - item2.getClassification());
         diff += abs(item1.getClumpThickness() - item2.getClumpThickness());
         diff += abs(item1.getMitoses()- item2.getMitoses());
         diff += abs(item1.getNormalNucleoli() - item2.getNormalNucleoli());
@@ -271,29 +293,7 @@ public class BreastCancerPrediction {
         }    
         return -i;
     }
-    public static int  PredictkNearestNeighbors(BreastCancerCompleteData item1, ArrayList<BreastCancerCompleteData> items, int k){
-        ArrayList<Integer> neighbors = new ArrayList<>(); //CLASSIFICATION STORED
-        HashMap<Integer, Integer> classfDist = new HashMap<>(); //DISTANCE->INDEX IN NEIGHBORS
-        int distance = 0;
-
-        for(BreastCancerCompleteData item: items){
-            // System.out.println("In Knn" + items.size());
-            //PROBLEM: NEIGHBORS REMOVES FIRST OCCURENCE INSTEAD OF THAT ITEM WITH LARGEST INDEX: SOLN = STORE INDEX, NOT CLASSIFICATION
-            distance = PredictdistanceMetric(item1, item);
-            if(neighbors.size()<k && distance!=0){
-                neighbors.add(item.getClassification());
-                classfDist.put(distance, neighbors.size()-1);
-            }    
-            else{ 
-                if(!classfDist.keySet().isEmpty() && Collections.max(classfDist.keySet())>distance && distance!=0){                    
-                    neighbors.add(item.getClassification());
-                    neighbors.remove((classfDist.get(Collections.max(classfDist.keySet()))));
-                    classfDist.put(distance, neighbors.size());
-                    classfDist.remove(Collections.max(classfDist.keySet()));
-                }
-            }
-        
-        }
+    public static int pluralityTest(ArrayList<Integer> neighbors){
         int count2 = 0;
         int count4 = 0;
         for (int i : neighbors) {
@@ -309,6 +309,33 @@ public class BreastCancerPrediction {
                 return 2;
             } 
             return 4;
+    }
+    public static int PredictkNearestNeighbors(BreastCancerCompleteData item1, ArrayList<BreastCancerCompleteData> items, int k){
+        ArrayList<Integer> neighbors = new ArrayList<>(); //CLASSIFICATION STORED
+        HashMap<Integer, Integer> classfDist = new HashMap<>(); //DISTANCE->INDEX IN NEIGHBORS
+        int distance = 0;
+
+        for(BreastCancerCompleteData item: items){
+            // System.out.println("In Knn" + items.size());
+            //PROBLEM: NEIGHBORS REMOVES FIRST OCCURENCE INSTEAD OF THAT ITEM WITH LARGEST INDEX: SOLN = STORE INDEX, NOT CLASSIFICATION
+            distance = PredictdistanceMetric(item1, item);
+            if(neighbors.size()<k && distance!=0){
+                neighbors.add(item.getClassification());
+                classfDist.put(distance, item.getClassification());
+            }    
+            else{ 
+                if(!classfDist.keySet().isEmpty() && Collections.max(classfDist.keySet())>distance && distance!=0){                    
+                    neighbors.add(item.getClassification());
+                    neighbors.remove(neighbors.indexOf(classfDist.get(Collections.max(classfDist.keySet()))));
+                    classfDist.put(distance, item.getClassification());
+                    classfDist.remove(Collections.max(classfDist.keySet()));
+                }
+            }
+        
+        }
+
+        //PLURALITY TEST
+        return pluralityTest(neighbors);
 
 
     }
@@ -327,29 +354,28 @@ public class BreastCancerPrediction {
             
         }
         // System.out.println("SIZE IN K = " + totalCount);
-        return sum/(double)totalCount;
+        return (sum/(double)totalCount)*100;
     }
+    //DOCUMENTED//
     public static int bestKPredict(ArrayList<BreastCancerCompleteData> alcd){
+        System.out.println("NO OF RECORDS = " + alcd.size());
         HashMap<Integer, Double> kmap = new HashMap<>();
-        for(int k = 1; k<26; k++){
+        for(int k = 2; k<30; k++){
             kmap.put(k, accuracyOfKPredict(k, alcd));
-            System.out.println("K = " + k + "Accuracy = " + kmap.get(k));
+            System.out.println(kmap.get(k));
         }
     
-        int bestK = 1;
+        int bestK = 2;
         for(Map.Entry<Integer, Double> ele: kmap.entrySet()){
             if(ele.getValue() > kmap.get(bestK)){
                 bestK = ele.getKey();
             }
         }
+        System.out.println("BEST: K = " + bestK + "ACCURACY = " + kmap.get(bestK));
         return bestK;
+
     }
-    // public static void checkKNNPredict(ArrayList<BreastCancerCompleteData> alcd){
-    //     int k = bestKpredict(alcd);
-    //     for(BreastCancerCompleteData cd: alcd){
-    //         int classf = PredictkNearestNeighbors(cd, alcd, k)
-    //     }
-    // }
+
     public static void completeValuesMean(ArrayList<BreastCancerCompleteData> alcd, ArrayList<BreastCancerMissingData> almd){
         //REPLACING VALUES BY MEAN/MODE
         int sum = 0;
@@ -365,6 +391,7 @@ public class BreastCancerPrediction {
             item.blandChromatin,  item.normalNucleoli, item.mitoses, item.classification));
         }
     }
+    
     public static double percent(int a, int b){
         return (a/b)*100;
     }
@@ -377,7 +404,7 @@ public class BreastCancerPrediction {
     //     return replica;
     // }
 
-    
+    //DOCUMENTED//
     public static double accuracyOfK(int k, ArrayList<BreastCancerCompleteData> trainingSet){
         //Store sum of differences between predicted & known
         int sumDiff =0;
@@ -394,7 +421,7 @@ public class BreastCancerPrediction {
         // System.out.println("SIZE IN K = " + totalCount);
         return sumDiff/(double)totalCount;
     }
-
+    //DOCUMENTED//
     public static int bestK(ArrayList<BreastCancerCompleteData> trainingSet){
         HashMap<Integer, Double> kmap = new HashMap<>();
         for(int k = 1; k<26; k++){
@@ -410,6 +437,7 @@ public class BreastCancerPrediction {
         }
         return bestK;
     }
+    //DOCUMENTED//
     public static void completeByMeanError(ArrayList<BreastCancerCompleteData> alcd){
             int n = alcd.size();
             double mean = 0;
@@ -425,7 +453,6 @@ public class BreastCancerPrediction {
                 sumSquares += squaredDiff;
             }
             System.out.println("BY MEAN, DIFFERENCE = :" + sumSquares);
-            System.out.println("SIZE IN MEAN = " + alcd.size());
             System.out.println("BY MEAN, MSE = " + sumSquares/(double)alcd.size());
         
     }
@@ -557,29 +584,197 @@ public class BreastCancerPrediction {
 
             // Plot the learning curve
             for(int i = 0; i<trainSizes.length; i++){
-                System.out.println(accuracy[i]);
+                System.out.println("TRAINING SET SIZE = " + trainSizes[i] + " ACCURACY = " + accuracy[i]);
             }
 
     }
+    public static void LearningCurveKnnCrossValidation(ArrayList<BreastCancerCompleteData> alcd){
+        //POPULATE X & Y ARRAYS
+        //X-> ATTRIBUTES AND VALUES
+        //Y-> CLASSIFICATIONS
+         double[][] X = new double[alcd.size()][9];
+            double[] Y = new double[alcd.size()];
+            int i1=0;
+            for(BreastCancerCompleteData item : alcd){
+                X[i1][0] = item.getClumpThickness();
+                X[i1][1] = item.getcSizeUni();
+                X[i1][2] = item.getcShapeUni();
+                X[i1][3] = item.getmAdhesion();
+                X[i1][4] = item.getSecs();
+                X[i1][5] = item.getBareNuclei();
+                X[i1][6] = item.blandChromatin;
+                X[i1][7] = item.getNormalNucleoli();
+                X[i1][8] = item.getMitoses(); 
+                Y[i1] = item.getClassification();
+                i1++;
+            }
+            int[] trainSizes = {15, 25, 35, 45, 65, 75, 85, 95, 100, 120, 130, 170, 200, 240, 280, 320, 360, 400, 450, 500, 550, 600, 650, 680};
+        System.out.println("LENGTH OF X = " + X.length);
+            // Define arrays to store the accuracy and training set sizes
+            double[] accuracy = new double[trainSizes.length];
+            double[] trainSetSizes = new double[trainSizes.length];
+            shuffle(X, Y);
+            // Loop over the training set sizes
+            for (int i = 0; i < trainSizes.length; i++) {
+                int trainSize = trainSizes[i];
+                trainSetSizes[i] = trainSize;
+                double[][] X_train = new double[trainSize][X[0].length];
+                double[][] X_test = new double[X.length - trainSize][X[0].length];
+                double[] Y_train = new double[trainSize];
+                double[] Y_test = new double[X.length - trainSize];
+                int trainIdx = 0;
+                int testIdx = 0;
+
+                // Split the data into training and testing sets
+                for (int j = 0; j < X.length; j++) {
+                    if (j < trainSize) {
+                        // add data point to training set
+                        X_train[trainIdx] = X[j];
+                        Y_train[trainIdx] = Y[j];
+                        trainIdx++;
+                    } else {
+                        // add data point to testing set
+                        X_test[testIdx] = X[j];
+                        Y_test[testIdx] = Y[j];
+                        testIdx++;
+                    }
+                }
+
+            
+
+            //TRAINING IN KNN === FINDING OPTIMAL K
+            //TESTING IN KNN === PREDICTING VALUES USING OPTIMAL K
+
+            //CONVERTING X_tEST AND Y_TEST TO AN ARRAYLIST
+            ArrayList<BreastCancerCompleteData> testSet = new ArrayList<>();
+            ArrayList<BreastCancerCompleteData> trainSet = new ArrayList<>();
+            int j = 0;
+            for (int i2 = 0; i2 < X_train.length; i2++) {
+                BreastCancerCompleteData dataPoint = new BreastCancerCompleteData(j++,
+                (int) X_train[i2][0], (int) X_train[i2][1], (int) X_train[i2][2],
+                (int) X_train[i2][3], (int) X_train[i2][4], (int) X_train[i2][5],
+                (int) X_train[i2][6], (int) X_train[i2][7], (int) X_train[i2][8],
+                (int) Y_train[i2]
+                );
+                trainSet.add(dataPoint);
+            }
+            for (int i2 = 0; i2 < X_test.length; i2++) {
+                BreastCancerCompleteData dataPoint = new BreastCancerCompleteData(j++,
+                (int) X_test[i2][0], (int) X_test[i2][1], (int) X_test[i2][2],
+                (int) X_test[i2][3], (int) X_test[i2][4], (int) X_test[i2][5],
+                (int) X_test[i2][6], (int) X_test[i2][7], (int) X_test[i2][8],
+                (int) Y_test[i2]
+                );
+                testSet.add(dataPoint);
+            }
+            
+            int k1 = bestKPredict(trainSet);
+            System.out.println("OPTIMAL K FOUND = " + k1);
+            accuracy[i] = accuracyOfKPredict(k1, testSet);
+            System.out.println("TEST ACCURACY = " + accuracy[i]);
+        }
+        System.out.println("\n\nFINAL ACCURACIES \n\n");
+        for(int i = 0; i<trainSizes.length; i++){
+            System.out.println(accuracy[i]);
+        }
+       
+            
+    }
+    public static void knnCrossValidation(ArrayList<BreastCancerCompleteData> alcd){
+        //POPULATE X & Y ARRAYS
+        //X-> ATTRIBUTES AND VALUES
+        //Y-> CLASSIFICATIONS
+         double[][] X = new double[alcd.size()][9];
+            double[] Y = new double[alcd.size()];
+            int i1=0;
+            for(BreastCancerCompleteData item : alcd){
+                X[i1][0] = item.getClumpThickness();
+                X[i1][1] = item.getcSizeUni();
+                X[i1][2] = item.getcShapeUni();
+                X[i1][3] = item.getmAdhesion();
+                X[i1][4] = item.getSecs();
+                X[i1][5] = item.getBareNuclei();
+                X[i1][6] = item.blandChromatin;
+                X[i1][7] = item.getNormalNucleoli();
+                X[i1][8] = item.getMitoses(); 
+                Y[i1] = item.getClassification();
+                i1++;
+            }
+            int k = 5; // number of folds
+            int n = X.length; // size of data set
+            int foldSize = n / k; // size of each fold
+            double[] accuracy = new double[k]; // array to store accuracy of each fold
+
+            // shuffle the data set randomly
+            shuffle(X, Y);
+
+            // GENERATE THE TRAINING AND TESTING SETS
+            for (int i = 0; i < k; i++) {
+                // split data into training and testing sets
+                double[][] X_train = new double[n - foldSize][X[0].length];
+                double[][] X_test = new double[foldSize][X[0].length];
+                double[] Y_train = new double[n - foldSize];
+                double[] Y_test = new double[foldSize];
+                int trainIdx = 0;
+                int testIdx = 0;
+                for (int j = 0; j < n; j++) {
+                    if (j >= i * foldSize && j < (i + 1) * foldSize) {
+                        // add data point to testing set
+                        X_test[testIdx] = X[j];
+                        Y_test[testIdx] = Y[j];
+                        testIdx++;
+                    } else {
+                        // add data point to training set
+                        X_train[trainIdx] = X[j];
+                        Y_train[trainIdx] = Y[j];
+                        trainIdx++;
+                    }
+                }
+            
+
+            //TRAINING IN KNN === FINDING OPTIMAL K
+            //TESTING IN KNN === PREDICTING VALUES USING OPTIMAL K
+
+            //CONVERTING X_tEST AND Y_TEST TO AN ARRAYLIST
+            ArrayList<BreastCancerCompleteData> testSet = new ArrayList<>();
+            ArrayList<BreastCancerCompleteData> trainSet = new ArrayList<>();
+            int j = 0;
+            for (int i2 = 0; i2 < X_train.length; i2++) {
+                BreastCancerCompleteData dataPoint = new BreastCancerCompleteData(j++,
+                (int) X_train[i2][0], (int) X_train[i2][1], (int) X_train[i2][2],
+                (int) X_train[i2][3], (int) X_train[i2][4], (int) X_train[i2][5],
+                (int) X_train[i2][6], (int) X_train[i2][7], (int) X_train[i2][8],
+                (int) Y_train[i2]
+                );
+                trainSet.add(dataPoint);
+            }
+            for (int i2 = 0; i2 < X_test.length; i2++) {
+                BreastCancerCompleteData dataPoint = new BreastCancerCompleteData(j++,
+                (int) X_test[i2][0], (int) X_test[i2][1], (int) X_test[i2][2],
+                (int) X_test[i2][3], (int) X_test[i2][4], (int) X_test[i2][5],
+                (int) X_test[i2][6], (int) X_test[i2][7], (int) X_test[i2][8],
+                (int) Y_test[i2]
+                );
+                testSet.add(dataPoint);
+            }
+            
+            int k1 = bestKPredict(trainSet);
+            System.out.println("OPTIMAL K FOUND = " + k1);
+            accuracy[i] = accuracyOfKPredict(k1, testSet);
+            System.out.println("TEST ACCURACY = " + accuracy[i]);
+        }
+        double sum = 0;
+            for (int i = 0; i < k; i++) {
+                sum += accuracy[i];
+            }
+            double averageAccuracy = sum / k;
+            System.out.println("Average accuracy: " + averageAccuracy);
+            // return averageAccuracy
+            
+    }
     public static double crossValidation( double[][] X, double[] Y){
             OLSMultipleLinearRegression model = new OLSMultipleLinearRegression();
-            // double[][] X = new double[alcd.size()][9];
-            // double[] Y = new double[alcd.size()];
-            // int i1=0;
-            // for(BreastCancerCompleteData item : alcd){
-            //     X[i1][0] = item.getClumpThickness();
-            //     X[i1][1] = item.getcSizeUni();
-            //     X[i1][2] = item.getcShapeUni();
-            //     X[i1][3] = item.getmAdhesion();
-            //     X[i1][4] = item.getSecs();
-            //     X[i1][5] = item.getBareNuclei();
-            //     X[i1][6] = item.blandChromatin;
-            //     X[i1][7] = item.getNormalNucleoli();
-            //     X[i1][8] = item.getMitoses(); 
-            //     Y[i1] = item.getClassification();
-            //     i1++;
-            // }
-            // model.newSampleData(Y, X);
+            
             int k = 5; // number of folds
             int n = X.length; // size of data set
             int foldSize = n / k; // size of each fold
@@ -676,11 +871,24 @@ public class BreastCancerPrediction {
         }
         System.out.println("\n\nEnd of P-values");
     }
-    private static void shuffle(double[][] x, double[] y) {
+    private static void shuffle(double[][] X, double[] Y) {
     
-    
+        int n = Y.length;
+        Random rand = new Random();
+        for (int i = 0; i < n; i++) {
+            int j = rand.nextInt(n);
+            // swap X[i] with X[j]
+            double[] tempX = X[i];
+            X[i] = X[j];
+            X[j] = tempX;
+            // swap Y[i] with Y[j]
+            double tempY = Y[i];
+            Y[i] = Y[j];
+            Y[j] = tempY;
+        }
     }
-    public static void normalFeatureSelection(ArrayList<BreastCancerCompleteData> alcd){
+    //DOCUMENTED//
+    public static void normalFeatureSelection(ArrayList<BreastCancerCompleteData> alcd, double limit){
         OLSMultipleLinearRegression model = new OLSMultipleLinearRegression();
         double[][] X = new double[alcd.size()][9];
         double[] Y = new double[alcd.size()];
@@ -700,9 +908,10 @@ public class BreastCancerPrediction {
         }
         model.newSampleData(Y, X);
         double[] pValues = getPvalues(X, Y);
-        double currentSolution = 0.05;
+        double currentSolution = limit;
         for(int j = 0; j < pValues.length;j++ ) {
             if(pValues[j] > currentSolution) {
+                System.out.println("ATTRIBUTE ELIMINATED "+ pValues[j]);
                 // remove the j-th column from the X matrix
                 double[][] temp = new double[X.length][X[0].length - 1];
                 for(int m = 0; m < X.length; m++) {
@@ -715,7 +924,8 @@ public class BreastCancerPrediction {
                     }
                 }
                 X = temp; // update X matrix with the new one without the j-th column
-                pValues = getPvalues(X, Y); // recalculate p-values
+                pValues = getPvalues(X, Y);
+                j = 0; // recalculate p-values
             }
             
         }
@@ -744,9 +954,16 @@ public class BreastCancerPrediction {
                         predicted[j] = 2;
                     }
                 }
-        double accuracy = calculateAccuracy(Y,predicted);
-        System.out.println("P-value = 0.05 Accuracy = " + accuracy);        
+        double[] temp = new double[alcd.size()];
+        for(int i1 = 0; i1<alcd.size(); i1++){
+            temp[i1] = Y[i1];
+        }
+        double accuracy = crossValidation(X,Y);
+        double accuracy1 = calculateAccuracy(temp, predicted);
+        System.out.println("P-value = " + limit+ " Accuracy = " + accuracy);
+        System.out.println("P-value = " + limit + " Direct Accuracy = " + accuracy1);        
     }
+    //DOCUMENTED//
     public static double acceptanceProbability(double currentEnergy, double newEnergy, double temperature) {
         // If the new solution is better than the current solution, accept it
         if (newEnergy < currentEnergy) {
@@ -754,12 +971,13 @@ public class BreastCancerPrediction {
         }
         
         // Calculate the probability of accepting a worse solution based on the temperature and energy difference
-        return Math.exp((newEnergy-currentEnergy) / temperature);
+        return Math.exp((currentEnergy-newEnergy) / temperature);
     }
-    public static void doFeatureSelection(ArrayList<BreastCancerCompleteData> alcd){
+    //DOCUMENTED//
+    public static void doFeatureSelection(ArrayList<BreastCancerCompleteData> alcd, double lowerBoundValue, double upperBoundValue){
         OLSMultipleLinearRegression model = new OLSMultipleLinearRegression();
         double[][] X = new double[alcd.size()][9];
-        double[][] X2 = new double[alcd.size()][9];
+        double[][] X1 = new double[alcd.size()][9];
         double[] Y = new double[alcd.size()];
         int i=0;
         for(BreastCancerCompleteData item : alcd){
@@ -772,84 +990,118 @@ public class BreastCancerPrediction {
             X[i][6] = item.blandChromatin;
             X[i][7] = item.getNormalNucleoli();
             X[i][8] = item.getMitoses(); 
+
+
+            X1[i][0] = item.getClumpThickness();
+            X1[i][1] = item.getcSizeUni();
+            X1[i][2] = item.getcShapeUni();
+            X1[i][3] = item.getmAdhesion();
+            X1[i][4] = item.getSecs();
+            X1[i][5] = item.getBareNuclei();
+            X1[i][6] = item.blandChromatin;
+            X1[i][7] = item.getNormalNucleoli();
+            X1[i][8] = item.getMitoses(); 
             Y[i] = item.getClassification();
             i++;
         }
     
-        
+        model.newSampleData(Y, X);
         double[] pValues = getPvalues(X, Y);
-        X2 = Arrays.copyOf(X, X.length);
-        System.out.println("\n\nP-VALUES = ");
+        System.out.println("P-VALUES");
         for(int j = 0; j<pValues.length; j++){
             System.out.println(pValues[j]);
         }
-        // double lowerBound = 0.05E-200;
-        // double upperBound =  0.075E-30;
-        // Random random = new Random();
-        // double currentSolution = 0.075E-40;
-        // double temperature = INITIAL_TEMPERATURE;
-        // HashMap<Double, Double> pvalAccuracy = new HashMap<>();
-        // while (temperature > 1) {
-
-        //     double decreaseFactor = (currentSolution - lowerBound) / (upperBound - lowerBound);
-        //     currentSolution = upperBound - (decreaseFactor * (upperBound - lowerBound));
+        System.out.println("END OF P-VALUES");
+        double lowerBound = lowerBoundValue;
+        double upperBound =  upperBoundValue;
+        Random random = new Random();
+        double currentSolution = upperBoundValue;
+        double temperature = INITIAL_TEMPERATURE;
+        HashMap<Double, Double> pvalAccuracy = new HashMap<>();
+        while (temperature > 1) {
             
-        //     // generate a new solution within the bounds
-        //     double newSolution = random.nextDouble() * (upperBound - lowerBound) + lowerBound;
-        //     double acceptanceProbability = acceptanceProbability(currentSolution, newSolution, temperature);
-        //         if (acceptanceProbability > random.nextDouble()) {
-        //             currentSolution = newSolution;
-        //         }
-        //         for(int j = 0; j<pValues.length;j++ ) {
-        //             if(pValues[j]>currentSolution) {
-        //                 // System.out.println("ATTRIBUTE ELIMINATED " + pValues[j]);
-        //                 // remove the j-th column from the X matrix
-        //                 double[][] temp = new double[X.length][X[0].length - 1];
-        //                 for(int m = 0; m < X.length; m++) {
-        //                     int w = 0;
-        //                     for(int n = 0; n < X[0].length && w<X[0].length-1; n++) {
-        //                         if(n != j) {
-        //                             temp[m][w] = X[m][n];
-        //                             w++;
-        //                         }
-        //                     }
-        //                 }
-        //                 j=0;
-        //                 X = temp; // update X matrix with the new one without the j-th column
-        //                 pValues = getPvalues(X, Y); // recalculate p-values
-        //             }
-        //         }
+            // generate a new solution within the bounds
+            double newSolution = random.nextDouble() * (upperBound - lowerBound) + lowerBound;
+                double acceptanceProbability = acceptanceProbability(currentSolution, newSolution, temperature);
+                if (acceptanceProbability > random.nextDouble()) {
+                    currentSolution = newSolution;
+                }
+                for(int j = 0; j<pValues.length;j++ ) {
+                    if(pValues[j]>currentSolution) {
+                        System.out.println("ATTRIBUTE ELIMINATED " + pValues[j]);
+                        // remove the j-th column from the X matrix
+                        double[][] temp = new double[X.length][X[0].length - 1];
+                        for(int m = 0; m < X.length; m++) {
+                            int w = 0;
+                            for(int n = 0; n < X[0].length && w<X[0].length-1; n++) {
+                                if(n != j) {
+                                    temp[m][w] = X[m][n];
+                                    w++;
+                                }
+                            }
+                        }
+                        j=0;
+                        X = temp; // update X matrix with the new one without the j-th column
+                        pValues = getPvalues(X, Y); // recalculate p-values
+                    }
+                }
                     
 
-        //         double accuracy = crossValidation(X,Y);
-        //         System.out.println("P-values = " + currentSolution  + " Accuracy = " + accuracy); 
-        //         pvalAccuracy.put(currentSolution, accuracy);
-        //         temperature *= 1 - COOLING_RATE;
-
-        //         //REINITIALISE MATRIX AND PVALUES
-        //         X = X2;
-        //         pValues  = getPvalues(X, Y);
-        // }
-        // double pval = 0;
-        // double accuracy = 0;
-        // for(Map.Entry<Double, Double> entry: pvalAccuracy.entrySet()){
-        //     if(entry.getValue() > accuracy){
-        //         accuracy = entry.getValue();
-        //         pval = entry.getKey();
-        //     }
-        // }
-        // System.out.println("\n\nP VALUES:         ");
-        // for(Map.Entry<Double, Double> entry: pvalAccuracy.entrySet()){
-        //     System.out.println(entry.getKey());
-        // }
-        // System.out.println("\n\n ACCURACIES:    ");
-        // for(Map.Entry<Double, Double> entry: pvalAccuracy.entrySet()){
-        //     System.out.println(entry.getValue());
-        // }
-        // System.out.println("Best accuracy at p-value: "+pval +"of accuracy: " + accuracy);
-        //accuracy
+                model.newSampleData(Y, X);
+                double[] beta = model.estimateRegressionParameters();
+                // Get the residuals by calling estimateResiduals()
+                double[] residuals = model.estimateResiduals();
+                // Calculate the variance of the residuals
+                double s2 = 0.0;
+                for (int k = 0; k< residuals.length; k++) {
+                    s2 += residuals[k] * residuals[k];
+                }
+                s2 /= residuals.length - X[0].length;
+                // Calculate the standard errors of the regression coefficients
+                double[] stdErrs = new double[X[0].length];
+                for (int k = 0; k < X[0].length; k++) {
+                    stdErrs[k] = Math.sqrt(s2 * model.calculateResidualSumOfSquares() / ((X.length - X[0].length) * model.calculateTotalSumOfSquares()));
+                }
+                // Get the predicted values for the input data
+                double[] predicted = predict(X, Y, X);
+                for (int j = 0; j < predicted.length; j++) {
+                    if (predicted[j] >= 3) {
+                        predicted[j] = 4;
+                    } else {
+                        predicted[j] = 2;
+                    }
+                }
+                //FIND ACCURACY
+                double accuracy = calculateAccuracy(Y,predicted);
+                System.out.println("P-value = " + currentSolution  + " Accuracy = " + accuracy); 
+                pvalAccuracy.put(currentSolution, accuracy);
+                temperature *= 1 - COOLING_RATE;
+                X = X1;
+                System.out.println("LENGTH = " + X1[0].length);
+                pValues  = getPvalues(X, Y);
+        }
+        double pval = 0;
+        double accuracy = 0;
+        System.out.println("\n\n P-VALUES \n\n");
+        for(Map.Entry<Double, Double> entry: pvalAccuracy.entrySet()){
+            System.out.println(entry.getKey());
+        }
+        System.out.println("\n\n ACCURACIES \n\n");
+        for(Map.Entry<Double, Double> entry: pvalAccuracy.entrySet()){
+            System.out.println(entry.getValue());
+        }
+        System.out.println("END OF ACCURACIES");
+        for(Map.Entry<Double, Double> entry: pvalAccuracy.entrySet()){
+            if(entry.getValue() > accuracy){
+                accuracy = entry.getValue();
+                pval = entry.getKey();
+            }
+        }
+        System.out.println("Best accuracy at p-value: "+pval +"of accuracy: " + accuracy);
+    
     }
 
+    //DOCUMENTED//
     public static double[] predict(double[][] X, double[] Y, double[][] newX) {
         OLSMultipleLinearRegression model = new OLSMultipleLinearRegression();
         model.newSampleData(Y, X);
@@ -866,6 +1118,7 @@ public class BreastCancerPrediction {
         }
         return predictions;
     }
+    //DOCUMENTED//
     public static double[] getPvalues(double[][] X, double[] Y) {
         CustomOLS model = new CustomOLS();
         model.newSampleData(Y, X);
@@ -883,10 +1136,10 @@ public class BreastCancerPrediction {
     }
 
 
-
+    //DOCUMENTED//
     //DATA AUGMENTATION TECHNIQUES
     //1. ADDING RANDOM NOISE
-    public BreastCancerCompleteData addNoise(BreastCancerCompleteData record, double stdDev) {
+    public static BreastCancerCompleteData addNoise(BreastCancerCompleteData record, double stdDev) {
         Random rand = new Random();
         int cn = record.codeNumber;
         int ct = (int) Math.round(record.clumpThickness + rand.nextGaussian() * stdDev);
@@ -903,7 +1156,7 @@ public class BreastCancerPrediction {
     }
 
     //2. SCALING BY A FACTOR
-    public BreastCancerCompleteData scale(BreastCancerCompleteData record, double factor) {
+    public static BreastCancerCompleteData scale(BreastCancerCompleteData record, double factor) {
         int cn = record.codeNumber;
         int ct = (int) Math.round(record.clumpThickness * factor);
         int csu = (int) Math.round(record.cSizeUni * factor);
@@ -919,7 +1172,7 @@ public class BreastCancerPrediction {
     }
 
     //3. COMBINE TWO RECORDS FOR A NEW RECORD
-    public BreastCancerCompleteData combine(BreastCancerCompleteData record1, BreastCancerCompleteData record2) {
+    public static BreastCancerCompleteData combine(BreastCancerCompleteData record1, BreastCancerCompleteData record2) {
         int cn = record1.codeNumber;
         int ct = Math.max(record1.clumpThickness, record2.clumpThickness);
         int csu = Math.max(record1.cSizeUni, record2.cSizeUni);
@@ -930,11 +1183,20 @@ public class BreastCancerPrediction {
         int bc = Math.max(record1.blandChromatin, record2.blandChromatin);
         int nn = Math.max(record1.normalNucleoli, record2.normalNucleoli);
         int m = Math.max(record1.mitoses, record2.mitoses);
-        int cls = record1.classification;
+        int cls = Math.max(record1.classification, record2.classification);
         return new BreastCancerCompleteData(cn, ct, csu, cshu, ma, secs, bn, bc, nn, m, cls);
     }
 
-
+    public static ArrayList<BreastCancerCompleteData> augmentDataNoise(ArrayList<BreastCancerCompleteData> alcd){
+        double noiseStdDev = 0.05;
+        ArrayList<BreastCancerCompleteData> augmented = new ArrayList<>();
+        for(BreastCancerCompleteData cd: alcd){
+            augmented.add(cd);
+            augmented.add(addNoise(cd, noiseStdDev));
+        }
+        return augmented;
+    }
+    
 }
 
 

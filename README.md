@@ -34,3 +34,11 @@ considerable differences when predicting on the training set.
 For data augmentation, to improve the diversity of the dataset -
 we have proposed a few data augmentation techniques such as
 adding noise, scaling etc.
+
+# Instructions for running the application:
+1. Prerequisite: A local mysql server.
+2. Open the DBConnection.java file in each of the two projects
+(BreastCancerPrediction & HeartDiseasePrediction).
+3. Change the username and password in these two instances as per the credentials set in your system during your mysql installation. (For most mysql servers, the defaults are username: “root”, password: “”).
+4. Run the BreastCancerPrediction.java and the HeartDiseasePrediction.java independently.
+Note: The main functions of each of the two programs do not run all the functions in sequence. You may uncomment the function calls to get the outputs of specific functionalities as needed.

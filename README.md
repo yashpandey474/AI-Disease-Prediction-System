@@ -1,7 +1,7 @@
 # AI-Disease-Prediction-System
 AI-Disease Prediction System Project
 
-This report focuses on the model of predictive diagnosis involving
+This project focuses on the model of predictive diagnosis involving
 data munging, feature selection, model training and accuracy
 calculation. We try to introduce and validate methods that
 improve certain aspects of this process.
